@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: SpotifyMixUI, CircularSp-Arab, CircularSp-Hebr, CircularSp-Cyrl,
+    CircularSp-Grek, CircularSp-Deva, "Helvetica Neue", helvetica, arial,
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, "MS Gothic",
+    ui-sans-serif, system-ui, sans-serif;
+  --font-title: SpotifyMixUITitle, CircularSp-Arab, CircularSp-Hebr,
+    CircularSp-Cyrl, CircularSp-Grek, CircularSp-Deva, "Helvetica Neue",
+    helvetica, arial, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo,
+    "MS Gothic", ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-spotify-green: var(--spotify-green);
+  --color-spotify-green-hover: var(--spotify-green-hover);
+  --color-near-black: var(--near-black);
+  --color-dark-surface: var(--dark-surface);
+  --color-mid-dark: var(--mid-dark);
+  --color-dark-card: var(--dark-card);
+  --color-silver: var(--silver);
+  --color-near-white: var(--near-white);
+  --shadow-heavy: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-medium: 0 8px 8px rgba(0, 0, 0, 0.3);
+}
+
+@layer base {
+  :root {
+    --background: #121212;
+    --foreground: #ffffff;
+    --card: #181818;
+    --card-foreground: #ffffff;
+    --primary: #1ed760;
+    --primary-foreground: #000000;
+    --secondary: #1f1f1f;
+    --secondary-foreground: #ffffff;
+    --muted: #1f1f1f;
+    --muted-foreground: #b3b3b3;
+    --accent: #252525;
+    --accent-foreground: #ffffff;
+    --destructive: #f3727f;
+    --border: #272727;
+    --chart-3: #ffa42b;
+    --chart-4: #539df5;
+    --spotify-green: #1ed760;
+    --spotify-green-hover: #1fdf64;
+    --near-black: #121212;
+    --dark-surface: #181818;
+    --mid-dark: #1f1f1f;
+    --dark-card: #252525;
+    --silver: #b3b3b3;
+    --near-white: #cbcbcb;
+
+    color: var(--foreground);
+    background: var(--background);
+    font-family: var(--font-sans);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    min-width: 320px;
+    background: var(--background);
+  }
+
+  body {
+    min-width: 320px;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0;
+    overflow: hidden;
+    background: var(--background);
+    color: var(--foreground);
+  }
+
+  #root {
+    height: 100%;
+  }
+
+  button,
+  input,
+  textarea {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}
