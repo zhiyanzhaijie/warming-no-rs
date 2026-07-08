@@ -13,8 +13,11 @@ export function PieceCard({ piece }: PieceCardProps) {
           <h2 className="font-title text-lg font-bold leading-tight text-foreground">
             {piece.title}
           </h2>
-          <p className="mt-1 text-sm font-normal text-muted-foreground">
-            {piece.composer}
+          <p
+            className="mt-1 truncate text-sm font-normal text-muted-foreground"
+            title={piece.sourcePath ?? piece.composer}
+          >
+            {piece.sourcePath ?? piece.composer}
           </p>
         </div>
         <span className="rounded-sm bg-secondary px-2 py-1 text-[10.5px] font-semibold capitalize text-near-white">
@@ -24,8 +27,8 @@ export function PieceCard({ piece }: PieceCardProps) {
 
       <dl className="mt-5 grid grid-cols-3 gap-3 text-sm">
         <div>
-          <dt className="text-xs font-bold text-muted-foreground">调性</dt>
-          <dd className="mt-1 font-bold text-foreground">{piece.keySignature}</dd>
+          <dt className="text-xs font-bold text-muted-foreground">音符</dt>
+          <dd className="mt-1 font-bold text-foreground">{piece.noteCount ?? 0}</dd>
         </div>
         <div>
           <dt className="text-xs font-bold text-muted-foreground">速度</dt>

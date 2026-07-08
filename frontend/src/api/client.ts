@@ -1,43 +1,10 @@
-import type { AgentSuggestion, Piece, PracticeReport } from '../shared/types/domain'
-
-const pieces: Piece[] = [
-  {
-    id: 'bach-invention-1',
-    title: 'Invention No. 1',
-    composer: 'J. S. Bach',
-    level: '中级',
-    durationSeconds: 96,
-    keySignature: 'C Major',
-    bpm: 84,
-    progress: 0.68,
-    lastPracticedAt: '2026-07-07',
-    mistakeHotspots: [8, 9, 14, 21],
-  },
-  {
-    id: 'chopin-prelude-7',
-    title: 'Prelude Op. 28 No. 7',
-    composer: 'F. Chopin',
-    level: '初中级',
-    durationSeconds: 72,
-    keySignature: 'A Major',
-    bpm: 62,
-    progress: 0.42,
-    lastPracticedAt: '2026-07-05',
-    mistakeHotspots: [5, 6, 12],
-  },
-  {
-    id: 'czerny-299-4',
-    title: 'Etude Op. 299 No. 4',
-    composer: 'C. Czerny',
-    level: '中级',
-    durationSeconds: 118,
-    keySignature: 'G Major',
-    bpm: 96,
-    progress: 0.31,
-    lastPracticedAt: '2026-07-02',
-    mistakeHotspots: [10, 11, 18, 19, 20],
-  },
-]
+import { invoke } from '@tauri-apps/api/core'
+import type {
+  AgentSuggestion,
+  MidiScanReport,
+  Piece,
+  PracticeReport,
+} from '../shared/types/domain'
 
 const reports: PracticeReport[] = [
   {
@@ -78,13 +45,20 @@ const suggestions: AgentSuggestion[] = [
 const wait = (ms = 180) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
 export const apiClient = {
-  async listPieces() {
-    await wait()
-    return pieces
+  listPieces() {
+    return invoke<Piece[]>('music_list_pieces')
   },
-  async getPiece(pieceId: string) {
-    await wait()
-    return pieces.find((piece) => piece.id === pieceId) ?? pieces[0]
+  getPiece(pieceId: string) {
+    return invoke<Piece>('music_get_piece', { pieceId })
+  },
+  listWatchPaths() {
+    return invoke<{ paths: string[] }>('music_list_watch_paths')
+  },
+  addWatchPath(path: string) {
+    return invoke<MidiScanReport>('music_add_watch_path', { path })
+  },
+  refreshLocalLibrary() {
+    return invoke<MidiScanReport>('music_refresh_library')
   },
   async listReports() {
     await wait()

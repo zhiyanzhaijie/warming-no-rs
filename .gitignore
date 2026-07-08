@@ -34,6 +34,8 @@ venv/
 env/
 backend/.venv/
 backend/venv/
+backend/.local/
+.local/
 
 # Local app data and databases
 data/local/

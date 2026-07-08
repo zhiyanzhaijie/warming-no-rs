@@ -11,6 +11,15 @@ export type Piece = {
   progress: number
   lastPracticedAt: string
   mistakeHotspots: number[]
+  sourcePath?: string | null
+  arrangementCount?: number
+  noteCount?: number
+}
+
+export type MidiScanReport = {
+  watchedPaths: string[]
+  discoveredFiles: number
+  registeredFiles: number
 }
 
 export type PracticeReport = {
