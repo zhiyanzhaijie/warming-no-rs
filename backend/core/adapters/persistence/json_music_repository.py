@@ -1,0 +1,123 @@
+import json
+import threading
+from pathlib import Path
+from typing import Any
+
+from core.domain.music import (
+    ArrangementId,
+    MusicPiece,
+    MusicPieceId,
+    PianoArrangement,
+    PianoScore,
+    ScorePart,
+)
+
+
+class JsonMusicPieceRepository:
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._lock = threading.RLock()
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+
+    def save_piece(self, piece: MusicPiece) -> None:
+        with self._lock:
+            data = self._read()
+            pieces = data.setdefault("pieces", {})
+            pieces[piece.id.value] = piece_to_dict(piece)
+            self._write(data)
+
+    def find_piece(self, piece_id: MusicPieceId) -> MusicPiece | None:
+        with self._lock:
+            raw = self._read().get("pieces", {}).get(piece_id.value)
+            return piece_from_dict(raw) if raw else None
+
+    def list_pieces(self) -> list[MusicPiece]:
+        with self._lock:
+            pieces = [
+                piece_from_dict(raw)
+                for raw in self._read().get("pieces", {}).values()
+            ]
+            return sorted(pieces, key=lambda item: item.title.lower())
+
+    def list_watch_paths(self) -> list[str]:
+        with self._lock:
+            return list(self._read().get("watch_paths", []))
+
+    def save_watch_paths(self, paths: list[str]) -> None:
+        with self._lock:
+            data = self._read()
+            data["watch_paths"] = sorted(dict.fromkeys(paths))
+            self._write(data)
+
+    def _read(self) -> dict[str, Any]:
+        if not self._path.exists():
+            return {"pieces": {}, "watch_paths": []}
+        return json.loads(self._path.read_text(encoding="utf-8"))
+
+    def _write(self, data: dict[str, Any]) -> None:
+        self._path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
+
+def piece_to_dict(piece: MusicPiece) -> dict[str, Any]:
+    return {
+        "id": piece.id.value,
+        "title": piece.title,
+        "creator": piece.creator,
+        "created_at": piece.created_at,
+        "updated_at": piece.updated_at,
+        "arrangements": [
+            {
+                "id": arrangement.id.value,
+                "piece_id": arrangement.piece_id.value,
+                "title": arrangement.title,
+                "source_path": arrangement.source_path,
+                "fingerprint": arrangement.fingerprint,
+                "score": {
+                    "parts": [
+                        {"name": part.name, "note_count": part.note_count}
+                        for part in arrangement.score.parts
+                    ],
+                    "tempos": arrangement.score.tempos,
+                    "meters": arrangement.score.meters,
+                },
+            }
+            for arrangement in piece.arrangements
+        ],
+    }
+
+
+def piece_from_dict(data: dict[str, Any]) -> MusicPiece:
+    return MusicPiece(
+        id=MusicPieceId.parse(data["id"]),
+        title=data["title"],
+        creator=data.get("creator"),
+        created_at=data.get("created_at", ""),
+        updated_at=data.get("updated_at", ""),
+        arrangements=[
+            PianoArrangement(
+                id=ArrangementId.parse(item["id"]),
+                piece_id=MusicPieceId.parse(item["piece_id"]),
+                title=item["title"],
+                source_path=item["source_path"],
+                fingerprint=item["fingerprint"],
+                score=PianoScore(
+                    parts=[
+                        ScorePart(
+                            name=part["name"],
+                            note_count=int(part.get("note_count", 0)),
+                        )
+                        for part in item.get("score", {}).get("parts", [])
+                    ],
+                    tempos=[
+                        float(value)
+                        for value in item.get("score", {}).get("tempos", [])
+                    ],
+                    meters=list(item.get("score", {}).get("meters", [])),
+                ),
+            )
+            for item in data.get("arrangements", [])
+        ],
+    )
