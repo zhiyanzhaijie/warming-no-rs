@@ -44,6 +44,7 @@ const silentGain = 0.0001
 export function FallingNotes({ score }: FallingNotesProps) {
   const bpm = usePracticeStore((state) => state.bpm)
   const isPlaying = usePracticeStore((state) => state.isPlaying)
+  const seekRequest = usePracticeStore((state) => state.seekRequest)
   const setCurrentBeat = usePracticeStore((state) => state.setCurrentBeat)
   const [pixelsPerBeat, setPixelsPerBeat] = useState(88)
   const [renderWindow, setRenderWindow] = useState({ pieceId: score?.pieceId, beat: 0 })
@@ -54,6 +55,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
   const pianoKeyboardRef = useRef<PianoKeyboardHandle | null>(null)
   const currentBeatRef = useRef(0)
   const bpmRef = useRef(bpm)
+  const isPlayingRef = useRef(isPlaying)
   const pixelsPerBeatRef = useRef(pixelsPerBeat)
   const beatsPerMeasureRef = useRef(4)
   const renderStartBeatRef = useRef(0)
@@ -107,6 +109,10 @@ export function FallingNotes({ score }: FallingNotesProps) {
   useEffect(() => {
     bpmRef.current = bpm
   }, [bpm])
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying
+  }, [isPlaying])
 
   useLayoutEffect(() => {
     pixelsPerBeatRef.current = pixelsPerBeat
@@ -186,13 +192,51 @@ export function FallingNotes({ score }: FallingNotesProps) {
     activePitchCountsRef.current.clear()
     lastFrameAtRef.current = null
     setCurrentBeat(0)
+    setRenderWindow({ pieceId: score?.pieceId, beat: 0 })
     pianoKeyboardRef.current?.reset()
     stopAll(activeOscillatorsRef.current)
   }, [score?.pieceId, setCurrentBeat])
 
   useLayoutEffect(() => {
+    if (!seekRequest || seekRequest.pieceId !== score?.pieceId) return
+
+    const targetBeat = Math.max(0, Math.min(seekRequest.beat, score?.totalBeats ?? 0))
+    currentBeatRef.current = targetBeat
+    lastFrameAtRef.current = null
+    nextNoteIndexRef.current = lowerBoundNoteStart(notes, targetBeat)
+    nextKeyEventIndexRef.current = 0
+    activePitchCountsRef.current.clear()
+    pianoKeyboardRef.current?.reset()
+    processPianoKeyEvents(
+      pianoKeyEvents,
+      targetBeat,
+      nextKeyEventIndexRef,
+      activePitchCountsRef,
+      pianoKeyboardRef.current,
+    )
+    stopAll(activeOscillatorsRef.current)
+    if (isPlayingRef.current) {
+      scheduleSustainingNotesAtSeek(
+        notes,
+        targetBeat,
+        bpmRef.current,
+        audioRef,
+        activeOscillatorsRef,
+      )
+    }
+    setCurrentBeat(targetBeat)
+    if (beatLabelRef.current) {
+      beatLabelRef.current.textContent = `${Math.round(targetBeat)} / ${Math.ceil(score?.totalBeats ?? 0)} beats`
+    }
+    setRenderWindow({
+      pieceId: score?.pieceId,
+      beat: Math.floor(targetBeat / beatsPerMeasure) * beatsPerMeasure,
+    })
+  }, [beatsPerMeasure, notes, pianoKeyEvents, score?.pieceId, score?.totalBeats, seekRequest, setCurrentBeat])
+
+  useLayoutEffect(() => {
     updateTimelineTransform(timelineRef.current, currentBeatRef.current, renderStartBeat, pixelsPerBeat)
-  }, [pixelsPerBeat, renderStartBeat])
+  }, [pixelsPerBeat, preparedNotes.length, renderStartBeat, score?.pieceId])
 
   return (
     <section className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-card shadow-heavy">
@@ -342,34 +386,44 @@ function playDueNotes(
       continue
     }
 
-    const startDelay = Math.max(0, ((note.startBeat - currentBeat) * 60) / bpm)
-    const duration = remainingSeconds(note, Math.max(currentBeat, note.startBeat), bpm)
-    const startAt = audio.currentTime + startDelay
-    const oscillator = audio.createOscillator()
-    const gain = audio.createGain()
-    const sustainGain = Math.max(0.04, Math.min(0.22, note.velocity / 480))
-    const endAt = startAt + duration
-    const envelopeSeconds = audioAttackSeconds + audioReleaseSeconds
-
-    oscillator.type = 'sine'
-    oscillator.frequency.value = midiToFrequency(note.pitch)
-    gain.gain.setValueAtTime(silentGain, startAt)
-    if (duration <= envelopeSeconds) {
-      gain.gain.linearRampToValueAtTime(sustainGain, startAt + duration / 2)
-    } else {
-      const attackEndAt = startAt + audioAttackSeconds
-      const releaseStartAt = endAt - audioReleaseSeconds
-      gain.gain.linearRampToValueAtTime(sustainGain, attackEndAt)
-      gain.gain.setValueAtTime(sustainGain, releaseStartAt)
-    }
-    gain.gain.exponentialRampToValueAtTime(silentGain, endAt)
-    oscillator.connect(gain)
-    gain.connect(audio.destination)
-    oscillator.start(startAt)
-    oscillator.stop(endAt)
-    oscillator.onended = () => activeRef.current.delete(note.id)
-    activeRef.current.set(note.id, oscillator)
+    scheduleNote(audio, note, currentBeat, bpm, activeRef)
   }
+}
+
+function scheduleNote(
+  audio: AudioContext,
+  note: ScoreNote,
+  currentBeat: number,
+  bpm: number,
+  activeRef: MutableRefObject<Map<string, OscillatorNode>>,
+) {
+  const startDelay = Math.max(0, ((note.startBeat - currentBeat) * 60) / bpm)
+  const duration = remainingSeconds(note, Math.max(currentBeat, note.startBeat), bpm)
+  const startAt = audio.currentTime + startDelay
+  const oscillator = audio.createOscillator()
+  const gain = audio.createGain()
+  const sustainGain = Math.max(0.04, Math.min(0.22, note.velocity / 480))
+  const endAt = startAt + duration
+  const envelopeSeconds = audioAttackSeconds + audioReleaseSeconds
+
+  oscillator.type = 'sine'
+  oscillator.frequency.value = midiToFrequency(note.pitch)
+  gain.gain.setValueAtTime(silentGain, startAt)
+  if (duration <= envelopeSeconds) {
+    gain.gain.linearRampToValueAtTime(sustainGain, startAt + duration / 2)
+  } else {
+    const attackEndAt = startAt + audioAttackSeconds
+    const releaseStartAt = endAt - audioReleaseSeconds
+    gain.gain.linearRampToValueAtTime(sustainGain, attackEndAt)
+    gain.gain.setValueAtTime(sustainGain, releaseStartAt)
+  }
+  gain.gain.exponentialRampToValueAtTime(silentGain, endAt)
+  oscillator.connect(gain)
+  gain.connect(audio.destination)
+  oscillator.start(startAt)
+  oscillator.stop(endAt)
+  oscillator.onended = () => activeRef.current.delete(note.id)
+  activeRef.current.set(note.id, oscillator)
 }
 
 function remainingSeconds(note: ScoreNote, currentBeat: number, bpm: number) {
@@ -428,5 +482,40 @@ function processPianoKeyEvents(
       activePitchCountsRef.current.set(event.pitch, nextCount)
       if (currentCount === 0) keyboard.setKeyState(event.pitch, 'active')
     }
+  }
+}
+
+function lowerBoundNoteStart(notes: ScoreNote[], targetBeat: number) {
+  let low = 0
+  let high = notes.length
+  while (low < high) {
+    const middle = low + Math.floor((high - low) / 2)
+    if (notes[middle].startBeat < targetBeat) {
+      low = middle + 1
+    } else {
+      high = middle
+    }
+  }
+  return low
+}
+
+function scheduleSustainingNotesAtSeek(
+  notes: ScoreNote[],
+  targetBeat: number,
+  bpm: number,
+  audioRef: MutableRefObject<AudioContext | null>,
+  activeRef: MutableRefObject<Map<string, OscillatorNode>>,
+) {
+  const sustainingNotes: ScoreNote[] = []
+  for (const note of notes) {
+    if (note.startBeat >= targetBeat) break
+    if (note.startBeat + note.durationBeats > targetBeat) sustainingNotes.push(note)
+  }
+  if (sustainingNotes.length === 0) return
+
+  const audio = audioRef.current ?? new AudioContext()
+  audioRef.current = audio
+  for (const note of sustainingNotes) {
+    scheduleNote(audio, note, targetBeat, bpm, activeRef)
   }
 }
