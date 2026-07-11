@@ -95,7 +95,13 @@ class LocalMidiLibraryHandler:
         arrangement_id = local_midi_arrangement_id(command.file.fingerprint)
         existing = self._pieces.find_piece(piece_id)
 
-        if existing and any(item.id == arrangement_id for item in existing.arrangements):
+        existing_arrangement = None
+        if existing:
+            existing_arrangement = next(
+                (item for item in existing.arrangements if item.id == arrangement_id),
+                None,
+            )
+        if existing_arrangement and existing_arrangement.score.notes:
             return RegisterLocalMidiFileResult(piece=existing, created=False)
 
         try:

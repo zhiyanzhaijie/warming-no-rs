@@ -1,12 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { scoreApi } from '../api/score'
 import { PieceCard } from '../features/library/PieceCard'
 
 export function LibraryPage() {
   const queryClient = useQueryClient()
-  const [path, setPath] = useState('')
   const [message, setMessage] = useState<string | null>(null)
 
   const { data: pieces = [], isError, error } = useQuery({
@@ -17,10 +15,9 @@ export function LibraryPage() {
     queryKey: ['watch-paths'],
     queryFn: scoreApi.listWatchPaths,
   })
-  const addWatchPath = useMutation({
-    mutationFn: scoreApi.addWatchPath,
+  const addWatchPaths = useMutation({
+    mutationFn: scoreApi.addWatchPaths,
     onSuccess: (report) => {
-      setPath('')
       setMessage(
         `扫描 ${report.discoveredFiles} 个 MIDI，新增 ${report.registeredFiles} 首曲目`,
       )
@@ -29,6 +26,19 @@ export function LibraryPage() {
     },
     onError: (mutationError) => {
       setMessage(mutationError instanceof Error ? mutationError.message : '路径扫描失败')
+    },
+  })
+  const selectDirectories = useMutation({
+    mutationFn: scoreApi.selectWatchDirectories,
+    onSuccess: (paths) => {
+      if (paths.length === 0) {
+        setMessage('未选择文件夹')
+        return
+      }
+      addWatchPaths.mutate(paths)
+    },
+    onError: (mutationError) => {
+      setMessage(mutationError instanceof Error ? mutationError.message : '无法打开文件夹选择器')
     },
   })
   const refresh = useMutation({
@@ -44,16 +54,6 @@ export function LibraryPage() {
       setMessage(mutationError instanceof Error ? mutationError.message : '刷新失败')
     },
   })
-
-  const submitPath = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const value = path.trim()
-    if (!value) {
-      setMessage('请输入本地 MIDI 文件或目录路径')
-      return
-    }
-    addWatchPath.mutate(value)
-  }
 
   return (
     <div className="p-6 max-[720px]:p-4">
@@ -76,21 +76,24 @@ export function LibraryPage() {
       </header>
 
       <section className="mt-5 rounded-lg bg-card p-4 shadow-medium">
-        <form className="flex gap-2 max-[720px]:flex-col" onSubmit={submitPath}>
-          <input
-            value={path}
-            onChange={(event) => setPath(event.target.value)}
-            placeholder="/Users/name/Music/MIDI 或 /path/to/file.mid"
-            className="min-w-0 flex-1 rounded-full bg-secondary px-5 py-3 text-sm text-foreground shadow-[rgb(18,18,18)_0px_1px_0px,rgb(124,124,124)_0px_0px_0px_1px_inset] outline-none placeholder:text-muted-foreground focus:shadow-[rgb(18,18,18)_0px_1px_0px,rgb(255,255,255)_0px_0px_0px_1px_inset]"
-          />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-title text-lg font-bold text-foreground">
+              监听 MIDI 文件夹
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              选择一个或多个本地文件夹，应用会登记路径并立即扫描 .mid / .midi 文件。
+            </p>
+          </div>
           <button
-            type="submit"
-            disabled={addWatchPath.isPending}
+            type="button"
+            disabled={selectDirectories.isPending || addWatchPaths.isPending}
+            onClick={() => selectDirectories.mutate()}
             className="rounded-full bg-secondary px-5 py-3 text-sm font-bold uppercase tracking-[1.4px] text-foreground transition hover:bg-dark-card disabled:cursor-not-allowed disabled:opacity-60"
           >
-            监听路径
+            选择文件夹
           </button>
-        </form>
+        </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {(watchPaths?.paths ?? []).map((item) => (
             <span
@@ -117,7 +120,7 @@ export function LibraryPage() {
           pieces.map((piece) => <PieceCard key={piece.id} piece={piece} />)
         ) : (
           <div className="rounded-lg bg-card p-5 text-sm text-muted-foreground shadow-medium">
-            还没有 MIDI 曲目。添加一个包含 .mid 或 .midi 文件的本地路径。
+            还没有 MIDI 曲目。选择一个包含 .mid 或 .midi 文件的本地文件夹。
           </div>
         )}
       </section>

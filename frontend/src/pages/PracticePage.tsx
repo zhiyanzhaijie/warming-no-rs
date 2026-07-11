@@ -1,25 +1,88 @@
+import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { Bot } from 'lucide-react'
+import { scoreApi } from '../api/score'
+import { Button } from '@/components/ui/button'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { AgentPanel } from '../features/agent/AgentPanel'
 import { FallingNotes } from '../features/performance/FallingNotes'
+import { MeasureProgress } from '../features/practice/MeasureProgress'
 import { TransportControls } from '../features/practice/TransportControls'
+import { usePracticeStore } from '../features/practice/practiceStore'
 
 export function PracticePage() {
+  const [params] = useSearchParams()
+  const requestedPieceId = params.get('pieceId')
+  const setBpm = usePracticeStore((state) => state.setBpm)
+  const { data: pieces = [] } = useQuery({
+    queryKey: ['pieces'],
+    queryFn: scoreApi.listPieces,
+  })
+  const pieceId = requestedPieceId ?? pieces[0]?.id
+  const { data: score } = useQuery({
+    queryKey: ['piece-score', pieceId],
+    queryFn: () => scoreApi.getPieceScore(pieceId ?? ''),
+    enabled: Boolean(pieceId),
+  })
+
+  useEffect(() => {
+    if (score?.tempoBpm) {
+      setBpm(score.tempoBpm)
+    }
+  }, [score?.tempoBpm, setBpm])
+
   return (
-    <div className="grid gap-4 p-6 max-[720px]:p-4">
-      <header>
-        <p className="text-xs font-bold uppercase tracking-[1.8px] text-muted-foreground">
-          Synthesia Practice
-        </p>
-        <h1 className="mt-2 font-title text-2xl font-bold text-foreground">
-          下落音符练习
-        </h1>
+    <div className="flex h-full min-h-0 flex-col gap-2 p-3 max-[720px]:p-2">
+      <header className="flex shrink-0 items-center gap-3 rounded-lg bg-card px-3 py-2 shadow-medium max-[900px]:flex-wrap">
+        <div className="min-w-[12rem] flex-1">
+          <h1 className="truncate font-title text-base font-bold text-foreground">
+            {score?.title ?? '下落音符练习'}
+          </h1>
+          <p className="truncate text-[10px] font-bold uppercase tracking-[1.8px] text-muted-foreground">
+            Synthesia Practice
+          </p>
+        </div>
+
+        <div className="flex min-w-0 items-center gap-2">
+          <TransportControls compact />
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className="size-10 rounded-full bg-secondary text-muted-foreground hover:text-foreground"
+                aria-label="打开 Agent"
+                title="打开 Agent"
+              >
+                <Bot className="size-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="border-border bg-card p-0 text-foreground sm:max-w-md">
+              <SheetHeader className="border-b border-border px-4 py-3">
+                <SheetTitle className="font-title text-base">Agent</SheetTitle>
+                <SheetDescription>练习辅助与分析</SheetDescription>
+              </SheetHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                <AgentPanel />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </header>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_22rem] gap-4 max-[1180px]:grid-cols-1">
-        <div className="grid gap-4">
-          <FallingNotes />
-          <TransportControls />
-        </div>
-        <AgentPanel />
+      <MeasureProgress score={score} />
+
+      <div className="min-h-0 flex-1">
+        <FallingNotes score={score} />
       </div>
     </div>
   )

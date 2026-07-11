@@ -62,7 +62,7 @@ export function PieceCard({ piece }: PieceCardProps) {
         </Link>
         <Link
           className="rounded-full bg-secondary px-4 py-2 text-sm font-bold text-foreground transition hover:bg-dark-card"
-          to="/practice"
+          to={`/practice?pieceId=${encodeURIComponent(piece.id)}`}
         >
           练习
         </Link>

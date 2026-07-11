@@ -3,6 +3,7 @@ import type {
   AgentSuggestion,
   MidiScanReport,
   Piece,
+  PieceScore,
   PracticeReport,
 } from '../shared/types/domain'
 
@@ -51,11 +52,20 @@ export const apiClient = {
   getPiece(pieceId: string) {
     return invoke<Piece>('music_get_piece', { pieceId })
   },
+  getPieceScore(pieceId: string) {
+    return invoke<PieceScore>('music_get_piece_score', { pieceId })
+  },
   listWatchPaths() {
     return invoke<{ paths: string[] }>('music_list_watch_paths')
   },
+  selectWatchDirectories() {
+    return invoke<string[]>('select_midi_watch_directories')
+  },
   addWatchPath(path: string) {
     return invoke<MidiScanReport>('music_add_watch_path', { path })
+  },
+  addWatchPaths(paths: string[]) {
+    return invoke<MidiScanReport>('music_add_watch_paths', { paths })
   },
   refreshLocalLibrary() {
     return invoke<MidiScanReport>('music_refresh_library')

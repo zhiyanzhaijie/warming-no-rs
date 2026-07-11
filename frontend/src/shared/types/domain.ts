@@ -22,6 +22,24 @@ export type MidiScanReport = {
   registeredFiles: number
 }
 
+export type ScoreNote = {
+  id: string
+  pitch: number
+  startBeat: number
+  durationBeats: number
+  velocity: number
+  track: number
+}
+
+export type PieceScore = {
+  pieceId: string
+  title: string
+  tempoBpm: number
+  timeSignature: string
+  totalBeats: number
+  notes: ScoreNote[]
+}
+
 export type PracticeReport = {
   id: string
   pieceTitle: string

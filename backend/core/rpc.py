@@ -42,10 +42,18 @@ def dispatch(method: str, params: dict[str, Any]) -> Any:
         if piece is None:
             raise AppError.not_found("piece not found")
         return piece_response(piece)
+    if method == "music_get_piece_score":
+        piece = container.music.query.get_piece(MusicPieceId.parse(params["piece_id"]))
+        if piece is None:
+            raise AppError.not_found("piece not found")
+        return piece_score_response(piece)
     if method == "music_list_watch_paths":
         return {"paths": container.music.local_library.list_watch_paths()}
     if method == "music_add_watch_path":
         report = container.music.local_library.add_watch_path(params["path"])
+        return scan_report_response(report)
+    if method == "music_add_watch_paths":
+        report = container.music.local_library.add_watch_paths(params["paths"])
         return scan_report_response(report)
     if method == "music_refresh_library":
         report = container.music.local_library.refresh_watched_paths()
@@ -79,6 +87,36 @@ def scan_report_response(report: Any) -> dict[str, Any]:
         "watchedPaths": report.watched_paths,
         "discoveredFiles": report.discovered_files,
         "registeredFiles": report.registered_files,
+    }
+
+
+def piece_score_response(piece: MusicPiece) -> dict[str, Any]:
+    arrangement = piece.arrangements[0] if piece.arrangements else None
+    score = arrangement.score if arrangement else None
+    notes = score.notes if score else []
+    tempo = int(score.tempos[0]) if score and score.tempos else 120
+    time_signature = score.meters[0] if score and score.meters else "4/4"
+    total_beats = max(
+        (note.start_beats + note.duration_beats for note in notes),
+        default=0,
+    )
+    return {
+        "pieceId": piece.id.value,
+        "title": piece.title,
+        "tempoBpm": tempo,
+        "timeSignature": time_signature,
+        "totalBeats": total_beats,
+        "notes": [
+            {
+                "id": f"{index}-{note.pitch}-{note.start_beats:.4f}",
+                "pitch": note.pitch,
+                "startBeat": note.start_beats,
+                "durationBeats": note.duration_beats,
+                "velocity": note.velocity or 64,
+                "track": note.track,
+            }
+            for index, note in enumerate(notes)
+        ],
     }
 
 

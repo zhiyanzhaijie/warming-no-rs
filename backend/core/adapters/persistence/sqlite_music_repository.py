@@ -8,6 +8,7 @@ from core.domain.music import (
     ArrangementId,
     MusicPiece,
     MusicPieceId,
+    NoteEvent,
     PianoArrangement,
     PianoScore,
     ScorePart,
@@ -173,6 +174,16 @@ def score_to_dict(score: PianoScore) -> dict[str, Any]:
             {"name": part.name, "note_count": part.note_count}
             for part in score.parts
         ],
+        "notes": [
+            {
+                "pitch": note.pitch,
+                "start_beats": note.start_beats,
+                "duration_beats": note.duration_beats,
+                "velocity": note.velocity,
+                "track": note.track,
+            }
+            for note in score.notes
+        ],
         "tempos": score.tempos,
         "meters": score.meters,
     }
@@ -183,6 +194,20 @@ def score_from_dict(data: dict[str, Any]) -> PianoScore:
         parts=[
             ScorePart(name=part["name"], note_count=int(part.get("note_count", 0)))
             for part in data.get("parts", [])
+        ],
+        notes=[
+            NoteEvent(
+                pitch=int(note["pitch"]),
+                start_beats=float(note["start_beats"]),
+                duration_beats=float(note["duration_beats"]),
+                velocity=(
+                    int(note["velocity"])
+                    if note.get("velocity") is not None
+                    else None
+                ),
+                track=int(note.get("track", 0)),
+            )
+            for note in data.get("notes", [])
         ],
         tempos=[float(value) for value in data.get("tempos", [])],
         meters=list(data.get("meters", [])),

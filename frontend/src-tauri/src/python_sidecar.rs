@@ -160,6 +160,11 @@ pub fn music_get_piece(piece_id: String) -> Result<Value, String> {
 }
 
 #[tauri::command]
+pub fn music_get_piece_score(piece_id: String) -> Result<Value, String> {
+    call("music_get_piece_score", json!({ "piece_id": piece_id }))
+}
+
+#[tauri::command]
 pub fn music_list_watch_paths() -> Result<Value, String> {
     call("music_list_watch_paths", json!({}))
 }
@@ -170,6 +175,23 @@ pub fn music_add_watch_path(path: String) -> Result<Value, String> {
 }
 
 #[tauri::command]
+pub fn music_add_watch_paths(paths: Vec<String>) -> Result<Value, String> {
+    call("music_add_watch_paths", json!({ "paths": paths }))
+}
+
+#[tauri::command]
 pub fn music_refresh_library() -> Result<Value, String> {
     call("music_refresh_library", json!({}))
+}
+
+#[tauri::command]
+pub fn select_midi_watch_directories() -> Result<Vec<String>, String> {
+    let folders = rfd::FileDialog::new()
+        .set_title("选择 MIDI 曲库文件夹")
+        .pick_folders()
+        .unwrap_or_default();
+    Ok(folders
+        .into_iter()
+        .map(|path| path.display().to_string())
+        .collect())
 }

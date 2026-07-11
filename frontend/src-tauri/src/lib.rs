@@ -16,9 +16,12 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       python_sidecar::music_list_pieces,
       python_sidecar::music_get_piece,
+      python_sidecar::music_get_piece_score,
       python_sidecar::music_list_watch_paths,
       python_sidecar::music_add_watch_path,
-      python_sidecar::music_refresh_library
+      python_sidecar::music_add_watch_paths,
+      python_sidecar::music_refresh_library,
+      python_sidecar::select_midi_watch_directories
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

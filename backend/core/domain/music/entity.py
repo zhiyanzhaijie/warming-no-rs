@@ -4,6 +4,15 @@ from .value_object import ArrangementId, MusicPieceId
 
 
 @dataclass(frozen=True)
+class NoteEvent:
+    pitch: int
+    start_beats: float
+    duration_beats: float
+    velocity: int | None = None
+    track: int = 0
+
+
+@dataclass(frozen=True)
 class ScorePart:
     name: str
     note_count: int = 0
@@ -12,11 +21,14 @@ class ScorePart:
 @dataclass(frozen=True)
 class PianoScore:
     parts: list[ScorePart] = field(default_factory=list)
+    notes: list[NoteEvent] = field(default_factory=list)
     tempos: list[float] = field(default_factory=list)
     meters: list[str] = field(default_factory=list)
 
     @property
     def note_count(self) -> int:
+        if self.notes:
+            return len(self.notes)
         return sum(part.note_count for part in self.parts)
 
 

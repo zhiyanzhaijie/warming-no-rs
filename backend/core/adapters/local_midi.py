@@ -3,7 +3,7 @@ import threading
 from pathlib import Path
 
 from core.app.music.local_library_model import DiscoveredMidiFile
-from core.domain.music import PianoScore, ScorePart
+from core.domain.music import NoteEvent, PianoScore, ScorePart
 from core.adapters.persistence.json_music_repository import JsonMusicPieceRepository
 
 
@@ -116,25 +116,140 @@ def parse_midi_score(bytes_: bytes) -> PianoScore:
     if header_len < 6:
         raise ValueError("MIDI header length is invalid")
     track_count = int.from_bytes(bytes_[10:12], "big")
-    note_count = count_midi_note_on_events(bytes_)
-    if note_count == 0:
-        raise ValueError("MIDI contains no note events")
+    division = int.from_bytes(bytes_[12:14], "big", signed=False)
+    if division & 0x8000:
+        raise ValueError("SMPTE timecode MIDI timing is not supported yet")
+    ticks_per_beat = max(1, division)
+
+    offset = 8 + header_len
+    tempos: list[float] = []
+    meters: list[str] = []
+    parts: list[ScorePart] = []
+    notes: list[NoteEvent] = []
+
+    for track_index in range(track_count):
+        if offset + 8 > len(bytes_) or bytes_[offset : offset + 4] != b"MTrk":
+            break
+        track_len = int.from_bytes(bytes_[offset + 4 : offset + 8], "big")
+        track_data = bytes_[offset + 8 : offset + 8 + track_len]
+        offset += 8 + track_len
+        parsed = parse_track(track_data, ticks_per_beat, track_index)
+        tempos.extend(parsed["tempos"])
+        meters.extend(parsed["meters"])
+        notes.extend(parsed["notes"])
+        parts.append(
+            ScorePart(
+                name=f"Track {track_index + 1}",
+                note_count=len(parsed["notes"]),
+            )
+        )
+
     parts = [
+        part
+        for part in parts
+        if part.note_count > 0
+    ] or [
         ScorePart(name=f"Track {index + 1}", note_count=0)
         for index in range(track_count)
     ] or [ScorePart(name="Track 1", note_count=0)]
-    parts[0] = ScorePart(name=parts[0].name, note_count=note_count)
+    if not notes:
+        raise ValueError("MIDI contains no note events")
+    notes.sort(key=lambda note: (note.start_beats, note.pitch, note.track))
     return PianoScore(
         parts=parts,
-        tempos=[120.0],
-        meters=["4/4"],
+        notes=notes,
+        tempos=tempos or [120.0],
+        meters=meters or ["4/4"],
     )
 
 
-def count_midi_note_on_events(bytes_: bytes) -> int:
-    count = 0
-    for index in range(len(bytes_) - 2):
-        status = bytes_[index]
-        if 0x90 <= status <= 0x9F and bytes_[index + 2] > 0:
-            count += 1
-    return count
+def parse_track(track: bytes, ticks_per_beat: int, track_index: int) -> dict[str, list]:
+    offset = 0
+    absolute_ticks = 0
+    running_status: int | None = None
+    active: dict[tuple[int, int], list[tuple[int, int]]] = {}
+    notes: list[NoteEvent] = []
+    tempos: list[float] = []
+    meters: list[str] = []
+
+    while offset < len(track):
+        delta, offset = read_vlq(track, offset)
+        absolute_ticks += delta
+        if offset >= len(track):
+            break
+
+        status = track[offset]
+        if status & 0x80:
+            offset += 1
+            if status != 0xFF and status != 0xF0 and status != 0xF7:
+                running_status = status
+        elif running_status is not None:
+            status = running_status
+        else:
+            break
+
+        if status == 0xFF:
+            if offset >= len(track):
+                break
+            meta_type = track[offset]
+            offset += 1
+            length, offset = read_vlq(track, offset)
+            payload = track[offset : offset + length]
+            offset += length
+            if meta_type == 0x51 and len(payload) == 3:
+                micros = int.from_bytes(payload, "big")
+                if micros > 0:
+                    tempos.append(60_000_000 / micros)
+            elif meta_type == 0x58 and len(payload) >= 2:
+                denominator = 2 ** payload[1]
+                meters.append(f"{payload[0]}/{denominator}")
+            continue
+
+        if status in (0xF0, 0xF7):
+            length, offset = read_vlq(track, offset)
+            offset += length
+            continue
+
+        event_type = status & 0xF0
+        channel = status & 0x0F
+        data_len = 1 if event_type in (0xC0, 0xD0) else 2
+        data = track[offset : offset + data_len]
+        offset += data_len
+        if len(data) < data_len:
+            break
+
+        if event_type == 0x90 and data[1] > 0:
+            active.setdefault((channel, data[0]), []).append((absolute_ticks, data[1]))
+        elif event_type == 0x80 or event_type == 0x90:
+            key = (channel, data[0])
+            starts = active.get(key)
+            if not starts:
+                continue
+            start_ticks, velocity = starts.pop()
+            duration_ticks = absolute_ticks - start_ticks
+            if duration_ticks <= 0:
+                continue
+            notes.append(
+                NoteEvent(
+                    pitch=data[0],
+                    start_beats=start_ticks / ticks_per_beat,
+                    duration_beats=duration_ticks / ticks_per_beat,
+                    velocity=velocity,
+                    track=track_index,
+                )
+            )
+
+    return {"notes": notes, "tempos": tempos, "meters": meters}
+
+
+def read_vlq(data: bytes, offset: int) -> tuple[int, int]:
+    value = 0
+    for _ in range(4):
+        if offset >= len(data):
+            return value, offset
+        byte = data[offset]
+        offset += 1
+        value = (value << 7) | (byte & 0x7F)
+        if byte & 0x80 == 0:
+            break
+    return value, offset

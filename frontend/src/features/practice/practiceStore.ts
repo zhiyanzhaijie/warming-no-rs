@@ -3,12 +3,14 @@ import type { PracticeMode } from '../../shared/types/domain'
 
 type PracticeState = {
   bpm: number
+  currentBeat: number
   isPlaying: boolean
   loopEnabled: boolean
   loopRange: [number, number]
   mode: PracticeMode
   connectedDevice: string
   setBpm: (bpm: number) => void
+  setCurrentBeat: (currentBeat: number) => void
   setMode: (mode: PracticeMode) => void
   togglePlayback: () => void
   toggleLoop: () => void
@@ -17,12 +19,14 @@ type PracticeState = {
 
 export const usePracticeStore = create<PracticeState>((set) => ({
   bpm: 72,
+  currentBeat: 0,
   isPlaying: false,
   loopEnabled: true,
   loopRange: [8, 12],
   mode: 'both-hands',
   connectedDevice: 'Local MIDI Device',
   setBpm: (bpm) => set({ bpm }),
+  setCurrentBeat: (currentBeat) => set({ currentBeat }),
   setMode: (mode) => set({ mode }),
   togglePlayback: () => set((state) => ({ isPlaying: !state.isPlaying })),
   toggleLoop: () => set((state) => ({ loopEnabled: !state.loopEnabled })),
