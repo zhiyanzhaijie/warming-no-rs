@@ -5,6 +5,7 @@ import { PieceDetailPage } from '../pages/PieceDetailPage'
 import { PracticePage } from '../pages/PracticePage'
 import { ReportsPage } from '../pages/ReportsPage'
 import { SettingsPage } from '../pages/SettingsPage'
+import { ProcessingPage } from '../pages/ProcessingPage'
 
 export function AppRouter() {
   return (
@@ -16,6 +17,7 @@ export function AppRouter() {
           <Route path="/pieces/:pieceId" element={<PieceDetailPage />} />
           <Route path="/practice" element={<PracticePage />} />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/processing" element={<ProcessingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

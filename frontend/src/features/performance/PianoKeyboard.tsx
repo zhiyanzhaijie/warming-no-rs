@@ -1,15 +1,17 @@
-import { memo, useImperativeHandle, useRef } from 'react'
+import { memo, useImperativeHandle, useState } from 'react'
 import type { Ref } from 'react'
+import { cn } from '@/lib/utils'
 import {
   blackKeyLengthRatio,
   blackPianoKeys,
   visibleWhiteKeyLengthRatio,
   whitePianoKeys,
 } from './pianoGeometry'
+import type { PianoKeyGeometry } from './pianoGeometry'
 import type { PianoKeyState } from './pianoState'
 
 export type PianoKeyboardHandle = {
-  setKeyState: (pitch: number, state: PianoKeyState) => void
+  applyKeyStates: (changes: ReadonlyMap<number, PianoKeyState>) => void
   reset: () => void
 }
 
@@ -18,110 +20,82 @@ export const PianoKeyboard = memo(function PianoKeyboard({
 }: {
   ref?: Ref<PianoKeyboardHandle>
 }) {
-    const keyElementsRef = useRef<Map<number, HTMLDivElement>>(new Map())
+  const [keyStates, setKeyStates] = useState<ReadonlyMap<number, PianoKeyState>>(() => new Map())
 
-    useImperativeHandle(
-      ref,
-      () => ({
-        setKeyState(pitch, state) {
-          const element = keyElementsRef.current.get(pitch)
-          if (element && element.dataset.state !== state) {
-            element.dataset.state = state
-          }
-        },
-        reset() {
-          for (const element of keyElementsRef.current.values()) {
-            element.dataset.state = 'idle'
-          }
-        },
-      }),
-      [],
-    )
+  useImperativeHandle(
+    ref,
+    () => ({
+      applyKeyStates(changes) {
+        setKeyStates((currentStates) => applyChanges(currentStates, changes))
+      },
+      reset() {
+        setKeyStates(new Map())
+      },
+    }),
+    [],
+  )
 
-    return (
-      <div
-        className="relative w-full shrink-0 overflow-hidden rounded-b-[4px] bg-[#080808] shadow-[0_8px_16px_rgba(0,0,0,0.45)] [contain:layout_paint]"
-        style={{
-          aspectRatio: `${whitePianoKeys.length} / ${visibleWhiteKeyLengthRatio}`,
-        }}
-      >
-        {whitePianoKeys.map((key) => (
-          <PianoKey
-            key={key.pitch}
-            pitch={key.pitch}
-            isBlack={false}
-            leftPercent={key.leftPercent}
-            widthPercent={key.widthPercent}
-            registerElement={registerKeyElement(key.pitch, keyElementsRef.current)}
-          />
-        ))}
-        {blackPianoKeys.map((key) => (
-          <PianoKey
-            key={key.pitch}
-            pitch={key.pitch}
-            isBlack
-            leftPercent={key.leftPercent}
-            widthPercent={key.widthPercent}
-            registerElement={registerKeyElement(key.pitch, keyElementsRef.current)}
-          />
-        ))}
-      </div>
-    )
-  })
-
-const PianoKey = memo(function PianoKey({
-  pitch,
-  isBlack,
-  leftPercent,
-  widthPercent,
-  registerElement,
-}: {
-  pitch: number
-  isBlack: boolean
-  leftPercent: number
-  widthPercent: number
-  registerElement: (element: HTMLDivElement | null) => void
-}) {
   return (
     <div
-      ref={registerElement}
-      data-pitch={pitch}
-      data-state="idle"
-      className={isBlack ? blackKeyClassName : whiteKeyClassName}
+      className="relative isolate w-full shrink-0 overflow-hidden rounded-b-[4px] bg-[#080808] [contain:paint]"
+      style={{
+        aspectRatio: `${whitePianoKeys.length} / ${visibleWhiteKeyLengthRatio}`,
+      }}
+    >
+      {whitePianoKeys.map((key) => (
+        <PianoKey key={key.pitch} geometry={key} state={keyStates.get(key.pitch) ?? 'idle'} />
+      ))}
+      {blackPianoKeys.map((key) => (
+        <PianoKey key={key.pitch} geometry={key} state={keyStates.get(key.pitch) ?? 'idle'} />
+      ))}
+    </div>
+  )
+})
+
+function applyChanges(
+  currentStates: ReadonlyMap<number, PianoKeyState>,
+  changes: ReadonlyMap<number, PianoKeyState>,
+) {
+  const nextStates = new Map(currentStates)
+  for (const [pitch, state] of changes) {
+    if (state === 'idle') nextStates.delete(pitch)
+    else nextStates.set(pitch, state)
+  }
+  return nextStates
+}
+
+const PianoKey = memo(function PianoKey({
+  geometry,
+  state,
+}: {
+  geometry: PianoKeyGeometry
+  state: PianoKeyState
+}) {
+  const { isBlack, leftPercent, widthPercent } = geometry
+  return (
+    <div
+      className={cn(
+        'absolute rounded-b-[3px] [contain:paint]',
+        isBlack
+          ? 'top-0 z-10 bg-[#070707] shadow-[0_3px_6px_rgba(0,0,0,0.55),inset_0_-8px_12px_rgba(255,255,255,0.07)]'
+          : 'inset-y-0 border-r border-[#aaa] bg-[#f1f1f1] shadow-[inset_0_-8px_14px_rgba(0,0,0,0.14)] first:border-l',
+        state === 'active' && (isBlack ? 'bg-[#159447]' : 'bg-spotify-green'),
+        state === 'incorrect' && (isBlack ? 'bg-[#343434]' : 'bg-[#8f8f8f]'),
+      )}
       style={{
         left: `${leftPercent}%`,
         width: `${widthPercent}%`,
         height: isBlack ? `${blackKeyLengthRatio * 100}%` : '100%',
       }}
     >
-      <span
-        className={[
-          'pointer-events-none absolute left-1/2 hidden size-[clamp(4px,0.55vw,8px)] -translate-x-1/2 rounded-full bg-spotify-green shadow-[0_0_8px_rgba(30,215,96,0.7)] group-data-[state=guided]:block',
-          isBlack ? 'bottom-[18%]' : 'bottom-[14%]',
-        ].join(' ')}
-      />
+      {state === 'guided' ? (
+        <span
+          className={cn(
+            'pointer-events-none absolute left-1/2 size-[clamp(4px,0.55vw,8px)] -translate-x-1/2 rounded-full bg-spotify-green',
+            isBlack ? 'bottom-[18%]' : 'bottom-[14%]',
+          )}
+        />
+      ) : null}
     </div>
   )
 })
-
-const whiteKeyClassName = [
-  'group absolute inset-y-0 rounded-b-[3px] border-r border-[#aaa] bg-[#f1f1f1] shadow-[inset_0_-8px_14px_rgba(0,0,0,0.14)] first:border-l [contain:paint]',
-  'data-[state=active]:bg-spotify-green data-[state=active]:shadow-[inset_0_-8px_14px_rgba(0,0,0,0.16)]',
-  'data-[state=incorrect]:bg-[#9b9b9b] data-[state=incorrect]:saturate-0',
-].join(' ')
-
-const blackKeyClassName = [
-  'group absolute top-0 z-10 rounded-b-[3px] bg-[#070707] shadow-[0_3px_6px_rgba(0,0,0,0.55),inset_0_-8px_12px_rgba(255,255,255,0.07)] [contain:paint]',
-  'data-[state=active]:bg-[#159447] data-[state=active]:shadow-[inset_0_-8px_12px_rgba(0,0,0,0.2)]',
-  'data-[state=incorrect]:bg-[#343434] data-[state=incorrect]:saturate-0',
-].join(' ')
-
-function registerKeyElement(pitch: number, elements: Map<number, HTMLDivElement>) {
-  return (element: HTMLDivElement | null) => {
-    if (element) {
-      elements.set(pitch, element)
-    } else {
-      elements.delete(pitch)
-    }
-  }
-}

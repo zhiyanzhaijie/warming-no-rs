@@ -3,10 +3,12 @@ import type { CSSProperties, MutableRefObject } from 'react'
 import type { PieceScore, ScoreNote } from '../../shared/types/domain'
 import { buildMeasureTimings, parseBeatsPerMeasure } from '../practice/measureTiming'
 import { usePracticeStore } from '../practice/practiceStore'
+import { cn } from '@/lib/utils'
 import { PianoKeyboard } from './PianoKeyboard'
 import type { PianoKeyboardHandle } from './PianoKeyboard'
 import { buildPitchGuides, keyGeometryForPitch } from './pianoGeometry'
 import type { PianoKeyGeometry } from './pianoGeometry'
+import type { PianoKeyState } from './pianoState'
 
 type FallingNotesProps = {
   score?: PieceScore
@@ -239,8 +241,11 @@ export function FallingNotes({ score }: FallingNotesProps) {
   }, [pixelsPerBeat, preparedNotes.length, renderStartBeat, score?.pieceId])
 
   return (
-    <section className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-card shadow-heavy">
-      <div ref={noteViewportRef} className="relative min-h-0 flex-1 overflow-hidden">
+    <section className="relative flex h-full min-h-0 flex-col bg-card">
+      <div
+        ref={noteViewportRef}
+        className="relative min-h-0 flex-1 overflow-hidden rounded-t-lg bg-card [contain:paint] [isolation:isolate]"
+      >
         <div className="absolute left-4 top-4 z-20 rounded-full bg-secondary px-3 py-1 text-xs font-bold uppercase tracking-[1.4px] text-muted-foreground">
           {score ? (
             <>
@@ -274,7 +279,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
 
           <div
             ref={timelineRef}
-            className="absolute inset-x-0 bottom-0 [contain:paint] will-change-transform"
+            className="absolute inset-x-0 bottom-0 [contain:paint] will-change-transform transform-gpu"
             style={{ height: `${(renderEndBeat - renderStartBeat) * pixelsPerBeat}px` }}
           >
             {measureGuides.map((measure) => (
@@ -292,10 +297,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
             {preparedNotes.map((note) => (
               <div
                 key={note.id}
-                className={[
-                  'absolute rounded-t-[3px]',
-                  note.colorClassName,
-                ].join(' ')}
+                className={cn('absolute rounded-t-[3px]', note.colorClassName)}
                 style={initialNoteStyle(note, renderStartBeat, pixelsPerBeat)}
               />
             ))}
@@ -467,6 +469,7 @@ function processPianoKeyEvents(
   keyboard: PianoKeyboardHandle | null,
 ) {
   if (!keyboard) return
+  const changes = new Map<number, PianoKeyState>()
   while (
     nextEventIndexRef.current < events.length &&
     events[nextEventIndexRef.current].beat <= currentBeat
@@ -477,12 +480,13 @@ function processPianoKeyEvents(
     const nextCount = Math.max(0, currentCount + event.delta)
     if (nextCount === 0) {
       activePitchCountsRef.current.delete(event.pitch)
-      if (currentCount > 0) keyboard.setKeyState(event.pitch, 'idle')
+      if (currentCount > 0) changes.set(event.pitch, 'idle')
     } else {
       activePitchCountsRef.current.set(event.pitch, nextCount)
-      if (currentCount === 0) keyboard.setKeyState(event.pitch, 'active')
+      if (currentCount === 0) changes.set(event.pitch, 'active')
     }
   }
+  if (changes.size > 0) keyboard.applyKeyStates(changes)
 }
 
 function lowerBoundNoteStart(notes: ScoreNote[], targetBeat: number) {
