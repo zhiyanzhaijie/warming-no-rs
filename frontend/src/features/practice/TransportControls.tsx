@@ -12,12 +12,12 @@ const modes: Array<{ value: PracticeMode; label: string }> = [
 
 type TransportControlsProps = {
   compact?: boolean
-  availableHands?: ReadonlySet<'left' | 'right'>
+  availableModes?: ReadonlySet<PracticeMode>
 }
 
 export function TransportControls({
   compact = false,
-  availableHands = emptyHands,
+  availableModes = defaultModes,
 }: TransportControlsProps) {
   const bpm = usePracticeStore((state) => state.bpm)
   const isPlaying = usePracticeStore((state) => state.isPlaying)
@@ -82,7 +82,7 @@ export function TransportControls({
 
         <div className="flex rounded-full bg-secondary p-1">
           {modes.map((item) => {
-            const disabled = !isModeAvailable(item.value, availableHands)
+            const disabled = !availableModes.has(item.value)
             return (
             <button
               key={item.value}
@@ -107,13 +107,4 @@ export function TransportControls({
   )
 }
 
-const emptyHands: ReadonlySet<'left' | 'right'> = new Set()
-
-function isModeAvailable(
-  mode: PracticeMode,
-  availableHands: ReadonlySet<'left' | 'right'>,
-) {
-  if (mode === 'left-hand') return availableHands.has('left')
-  if (mode === 'right-hand') return availableHands.has('right')
-  return true
-}
+const defaultModes: ReadonlySet<PracticeMode> = new Set(['listen', 'free'])

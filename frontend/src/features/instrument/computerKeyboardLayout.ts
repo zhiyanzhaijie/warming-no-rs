@@ -1,28 +1,32 @@
-const computerKeyboardBindings = [
-  ['KeyA', 60, 'A'],
-  ['KeyW', 61, 'W'],
-  ['KeyS', 62, 'S'],
-  ['KeyE', 63, 'E'],
-  ['KeyD', 64, 'D'],
-  ['KeyF', 65, 'F'],
-  ['KeyT', 66, 'T'],
-  ['KeyG', 67, 'G'],
-  ['KeyY', 68, 'Y'],
-  ['KeyH', 69, 'H'],
-  ['KeyU', 70, 'U'],
-  ['KeyJ', 71, 'J'],
-  ['KeyK', 72, 'K'],
-  ['KeyO', 73, 'O'],
-  ['KeyL', 74, 'L'],
-  ['KeyP', 75, 'P'],
-  ['Semicolon', 76, ';'],
-  ['Quote', 77, "'"],
-] as const
+type ComputerKeyBinding = {
+  key: string
+  pitch: number
+  label: string
+}
 
-export const computerKeyboardPitchByCode: ReadonlyMap<string, number> = new Map(
-  computerKeyboardBindings.map(([code, pitch]) => [code, pitch]),
+const whiteLabels = '1234567890qwertyuiopasdfghjklzxcvbnm'.split('')
+const blackLabels = [
+  '!', '@', '$', '%', '^', '*', '(', 'Q', 'W', 'E', 'T', 'Y', 'I', 'O', 'P',
+  'S', 'D', 'G', 'H', 'J', 'L', 'Z', 'C', 'V', 'B',
+]
+const blackPitchClasses = new Set([1, 3, 6, 8, 10])
+
+export const computerKeyboardBindings: readonly ComputerKeyBinding[] = buildBindings()
+export const computerKeyboardPitchByKey: ReadonlyMap<string, number> = new Map(
+  computerKeyboardBindings.map((binding) => [binding.key, binding.pitch]),
 )
-
 export const computerKeyboardLabelByPitch: ReadonlyMap<number, string> = new Map(
-  computerKeyboardBindings.map(([, pitch, label]) => [pitch, label]),
+  computerKeyboardBindings.map((binding) => [binding.pitch, binding.label]),
 )
+
+function buildBindings() {
+  const bindings: ComputerKeyBinding[] = []
+  let whiteIndex = 0
+  let blackIndex = 0
+  for (let pitch = 36; pitch <= 96; pitch += 1) {
+    const isBlack = blackPitchClasses.has(pitch % 12)
+    const label = isBlack ? blackLabels[blackIndex++] : whiteLabels[whiteIndex++]
+    if (label) bindings.push({ key: label, pitch, label })
+  }
+  return bindings
+}

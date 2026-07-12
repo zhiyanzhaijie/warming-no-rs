@@ -1,15 +1,11 @@
 import { useEffect, useRef } from 'react'
-import type { RefObject } from 'react'
-import { instrumentOutput, type MidiEvent } from '../../api/instrument'
-import type { PianoKeyboardHandle } from '../performance/PianoKeyboard'
-import { computerKeyboardPitchByCode } from './computerKeyboardLayout'
+import { pianoInputBus } from './input/PianoInputBus'
+import { computerKeyboardPitchByKey } from './computerKeyboardLayout'
 
 const computerKeyboardVelocity = 100
 
 export function useComputerKeyboard(
   enabled: boolean,
-  keyboardRef: RefObject<PianoKeyboardHandle | null>,
-  onNoteOn?: (pitch: number) => void,
 ) {
   const pressedKeysRef = useRef(new Map<string, number>())
 
@@ -17,50 +13,36 @@ export function useComputerKeyboard(
     if (!enabled) return
     const pressedKeys = pressedKeysRef.current
 
-    const send = (events: MidiEvent[]) => {
-      void instrumentOutput.send(events).catch((error: unknown) => {
-        console.error('Unable to send computer keyboard MIDI event', error)
-      })
-    }
-    const setKeyState = (pitch: number, state: 'active' | 'idle') => {
-      keyboardRef.current?.applyKeyStates(new Map([[pitch, state]]))
-    }
     const releaseAll = () => {
       if (pressedKeys.size === 0) return
-      const events = Array.from(pressedKeys.values(), (pitch): MidiEvent => ({
-        type: 'noteOff',
-        channel: 0,
-        note: pitch,
-        velocity: 0,
-      }))
-      for (const pitch of pressedKeys.values()) setKeyState(pitch, 'idle')
+      for (const pitch of pressedKeys.values()) {
+        pianoInputBus.emit({
+          type: 'noteOff', sourceId: 'computer-keyboard-61', channel: 0,
+          pitch, velocity: 0, timestamp: performance.now(),
+        })
+      }
       pressedKeys.clear()
-      send(events)
     }
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || isEditableTarget(event.target)) return
-      const pitch = computerKeyboardPitchByCode.get(event.code)
+      const pitch = computerKeyboardPitchByKey.get(event.key)
       if (pitch === undefined || pressedKeys.has(event.code)) return
       event.preventDefault()
       pressedKeys.set(event.code, pitch)
-      setKeyState(pitch, 'active')
-      onNoteOn?.(pitch)
-      send([
-        {
-          type: 'noteOn',
-          channel: 0,
-          note: pitch,
-          velocity: computerKeyboardVelocity,
-        },
-      ])
+      pianoInputBus.emit({
+        type: 'noteOn', sourceId: 'computer-keyboard-61', channel: 0,
+        pitch, velocity: computerKeyboardVelocity, timestamp: performance.now(),
+      })
     }
     const handleKeyUp = (event: KeyboardEvent) => {
       const pitch = pressedKeys.get(event.code)
       if (pitch === undefined) return
       event.preventDefault()
       pressedKeys.delete(event.code)
-      setKeyState(pitch, 'idle')
-      send([{ type: 'noteOff', channel: 0, note: pitch, velocity: 0 }])
+      pianoInputBus.emit({
+        type: 'noteOff', sourceId: 'computer-keyboard-61', channel: 0,
+        pitch, velocity: 0, timestamp: performance.now(),
+      })
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -72,7 +54,7 @@ export function useComputerKeyboard(
       window.removeEventListener('blur', releaseAll)
       releaseAll()
     }
-  }, [enabled, keyboardRef, onNoteOn])
+  }, [enabled])
 }
 
 function isEditableTarget(target: EventTarget | null) {

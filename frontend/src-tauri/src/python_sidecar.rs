@@ -99,7 +99,11 @@ impl PythonSidecar {
 
     fn ensure_running(&mut self) -> Result<(), String> {
         if let Some(child) = self.child.as_mut() {
-            if child.try_wait().map_err(|error| error.to_string())?.is_none() {
+            if child
+                .try_wait()
+                .map_err(|error| error.to_string())?
+                .is_none()
+            {
                 return Ok(());
             }
         }

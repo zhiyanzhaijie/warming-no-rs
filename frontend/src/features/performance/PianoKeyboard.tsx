@@ -1,12 +1,7 @@
 import { memo, useImperativeHandle, useState } from 'react'
 import type { Ref } from 'react'
 import { cn } from '@/lib/utils'
-import {
-  blackKeyLengthRatio,
-  blackPianoKeys,
-  visibleWhiteKeyLengthRatio,
-  whitePianoKeys,
-} from './pianoGeometry'
+import { blackKeyLengthRatio, visibleWhiteKeyLengthRatio } from './pianoGeometry'
 import type { PianoKeyGeometry } from './pianoGeometry'
 import type { PianoKeyState } from './pianoState'
 
@@ -18,11 +13,15 @@ export type PianoKeyboardHandle = {
 export const PianoKeyboard = memo(function PianoKeyboard({
   ref,
   keyLabels,
+  keys,
 }: {
   ref?: Ref<PianoKeyboardHandle>
   keyLabels?: ReadonlyMap<number, string>
+  keys: readonly PianoKeyGeometry[]
 }) {
   const [keyStates, setKeyStates] = useState<ReadonlyMap<number, PianoKeyState>>(() => new Map())
+  const whiteKeys = keys.filter((key) => !key.isBlack)
+  const blackKeys = keys.filter((key) => key.isBlack)
 
   useImperativeHandle(
     ref,
@@ -41,10 +40,10 @@ export const PianoKeyboard = memo(function PianoKeyboard({
     <div
       className="relative isolate w-full shrink-0 overflow-hidden rounded-b-[4px] bg-[#080808] [contain:paint]"
       style={{
-        aspectRatio: `${whitePianoKeys.length} / ${visibleWhiteKeyLengthRatio}`,
+        aspectRatio: `${whiteKeys.length} / ${visibleWhiteKeyLengthRatio}`,
       }}
     >
-      {whitePianoKeys.map((key) => (
+      {whiteKeys.map((key) => (
         <PianoKey
           key={key.pitch}
           geometry={key}
@@ -52,7 +51,7 @@ export const PianoKeyboard = memo(function PianoKeyboard({
           label={keyLabels?.get(key.pitch)}
         />
       ))}
-      {blackPianoKeys.map((key) => (
+      {blackKeys.map((key) => (
         <PianoKey
           key={key.pitch}
           geometry={key}

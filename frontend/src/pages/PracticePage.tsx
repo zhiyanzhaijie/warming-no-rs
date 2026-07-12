@@ -17,6 +17,8 @@ import { FallingNotes } from '../features/performance/FallingNotes'
 import { MeasureProgress } from '../features/practice/MeasureProgress'
 import { TransportControls } from '../features/practice/TransportControls'
 import { usePracticeStore } from '../features/practice/practiceStore'
+import { InputDeviceControl } from '../features/instrument/input/InputDeviceControl'
+import type { PracticeMode, ScoreNote } from '../shared/types/domain'
 
 export function PracticePage() {
   const [params] = useSearchParams()
@@ -45,18 +47,14 @@ export function PracticePage() {
     if (mode !== 'listen' && pieceId) void refetchScore()
   }, [mode, pieceId, refetchScore])
 
-  const availableHands = useMemo(() => {
-    const hands = new Set<'left' | 'right'>()
-    for (const note of score?.notes ?? []) {
-      if (note.hand === 'left' || note.hand === 'right') hands.add(note.hand)
-    }
-    return hands
-  }, [score?.notes])
+  const availableModes = useMemo(
+    () => buildAvailableModes(score?.notes ?? []),
+    [score?.notes],
+  )
 
   useEffect(() => {
-    if (mode === 'left-hand' && !availableHands.has('left')) setMode('listen')
-    if (mode === 'right-hand' && !availableHands.has('right')) setMode('listen')
-  }, [availableHands, mode, setMode])
+    if (!availableModes.has(mode)) setMode('listen')
+  }, [availableModes, mode, setMode])
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-3 max-[720px]:p-2">
@@ -71,7 +69,8 @@ export function PracticePage() {
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
-          <TransportControls compact availableHands={availableHands} />
+          <InputDeviceControl />
+          <TransportControls compact availableModes={availableModes} />
           <Sheet>
             <SheetTrigger asChild>
               <Button
@@ -105,4 +104,14 @@ export function PracticePage() {
       </div>
     </div>
   )
+}
+
+function buildAvailableModes(
+  notes: ScoreNote[],
+) {
+  const modes = new Set<PracticeMode>(['listen', 'free'])
+  if (notes.some((note) => note.hand === 'left')) modes.add('left-hand')
+  if (notes.some((note) => note.hand === 'right')) modes.add('right-hand')
+  if (notes.length > 0) modes.add('both-hands')
+  return modes
 }

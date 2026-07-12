@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { type ReactNode, useState } from 'react'
+import { PianoInputProvider } from '../features/instrument/input/PianoInputProvider'
 
 type AppProvidersProps = {
   children: ReactNode
@@ -19,6 +20,8 @@ export function AppProviders({ children }: AppProvidersProps) {
   )
 
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <PianoInputProvider>{children}</PianoInputProvider>
+    </QueryClientProvider>
   )
 }

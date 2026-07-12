@@ -112,7 +112,9 @@ pub fn select_audio_file() -> Result<Option<SelectedAudioFile>, String> {
         ));
     }
 
-    let metadata = path.metadata().map_err(|error| format!("无法读取文件：{error}"))?;
+    let metadata = path
+        .metadata()
+        .map_err(|error| format!("无法读取文件：{error}"))?;
     let name = path
         .file_name()
         .and_then(|value| value.to_str())

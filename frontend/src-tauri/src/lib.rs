@@ -1,4 +1,5 @@
 mod audio_output;
+mod midi_input;
 mod python_sidecar;
 mod transcription;
 
@@ -16,6 +17,7 @@ pub fn run() {
                         .join("resources/default.sf2")
                 });
             app.manage(audio_output::AudioOutput::start(soundfont));
+            app.manage(midi_input::MidiInputState::default());
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -40,7 +42,10 @@ pub fn run() {
             transcription::generate_midi,
             audio_output::audio_output_status,
             audio_output::audio_send_events,
-            audio_output::audio_stop_all
+            audio_output::audio_stop_all,
+            midi_input::midi_list_inputs,
+            midi_input::midi_connect_input,
+            midi_input::midi_disconnect_input
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

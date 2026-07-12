@@ -6,7 +6,7 @@ export type PianoKeyGeometry = {
 }
 
 export const keyboardStartPitch = 36
-export const keyboardKeyCount = 65
+export const keyboardKeyCount = 61
 export const keyboardEndPitch = keyboardStartPitch + keyboardKeyCount - 1
 export const visibleWhiteKeyLengthRatio = 3.6
 export const blackKeyLengthRatio = 0.64
@@ -14,7 +14,7 @@ export const blackKeyLengthRatio = 0.64
 const blackPitchClasses = new Set([1, 3, 6, 8, 10])
 const blackKeyWidthRatio = 0.58
 
-export const pianoKeys = buildPianoKeyGeometry()
+export const pianoKeys = buildPianoKeyGeometry(keyboardStartPitch, keyboardEndPitch)
 export const whitePianoKeys = pianoKeys.filter((key) => !key.isBlack)
 export const blackPianoKeys = pianoKeys.filter((key) => key.isBlack)
 
@@ -27,12 +27,12 @@ export function buildPitchGuides(pitchClass: number) {
   return pianoKeys.filter((key) => key.pitch % 12 === pitchClass && !key.isBlack)
 }
 
-function buildPianoKeyGeometry(): PianoKeyGeometry[] {
+export function buildPianoKeyGeometry(startPitch: number, endPitch: number): PianoKeyGeometry[] {
   const keys: PianoKeyGeometry[] = []
   const whitePitchToIndex = new Map<number, number>()
   let whiteKeyCount = 0
 
-  for (let pitch = keyboardStartPitch; pitch <= keyboardEndPitch; pitch += 1) {
+  for (let pitch = startPitch; pitch <= endPitch; pitch += 1) {
     if (!isBlackPitch(pitch)) {
       whitePitchToIndex.set(pitch, whiteKeyCount)
       whiteKeyCount += 1
@@ -42,7 +42,7 @@ function buildPianoKeyGeometry(): PianoKeyGeometry[] {
   const whiteWidth = 100 / whiteKeyCount
   const blackWidth = whiteWidth * blackKeyWidthRatio
 
-  for (let pitch = keyboardStartPitch; pitch <= keyboardEndPitch; pitch += 1) {
+  for (let pitch = startPitch; pitch <= endPitch; pitch += 1) {
     const isBlack = isBlackPitch(pitch)
     if (!isBlack) {
       const whiteIndex = whitePitchToIndex.get(pitch) ?? 0
