@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type { CSSProperties, MutableRefObject } from 'react'
 import type { PieceScore, ScoreNote } from '../../shared/types/domain'
+import { instrumentOutput, type MidiEvent } from '../../api/instrument'
 import { buildMeasureTimings, parseBeatsPerMeasure } from '../practice/measureTiming'
 import { usePracticeStore } from '../practice/practiceStore'
 import { cn } from '@/lib/utils'
@@ -32,16 +33,17 @@ type PianoKeyEvent = {
   delta: 1 | -1
 }
 
+type PlaybackMidiEvent = {
+  beat: number
+  event: MidiEvent
+}
+
 const octaveGuides = buildPitchGuides(0)
 const innerPitchGuides = buildPitchGuides(5)
 const beatLabelIntervalMs = 250
 const visibleMeasureCount = 1.5
 const renderAheadMeasureCount = 8
 const renderBehindMeasureCount = 2
-const audioScheduleAheadSeconds = 0.12
-const audioAttackSeconds = 0.008
-const audioReleaseSeconds = 0.035
-const silentGain = 0.0001
 
 export function FallingNotes({ score }: FallingNotesProps) {
   const bpm = usePracticeStore((state) => state.bpm)
@@ -66,17 +68,16 @@ export function FallingNotes({ score }: FallingNotesProps) {
   const renderTransitionPendingRef = useRef(false)
   const lastFrameAtRef = useRef<number | null>(null)
   const lastBeatLabelAtRef = useRef(0)
-  const nextNoteIndexRef = useRef(0)
+  const nextMidiEventIndexRef = useRef(0)
   const nextKeyEventIndexRef = useRef(0)
   const activePitchCountsRef = useRef<Map<number, number>>(new Map())
-  const audioRef = useRef<AudioContext | null>(null)
-  const activeOscillatorsRef = useRef<Map<string, OscillatorNode>>(new Map())
 
   const notes = useMemo(
     () => (score?.notes ?? []).toSorted((a, b) => a.startBeat - b.startBeat),
     [score?.notes],
   )
   const pianoKeyEvents = useMemo(() => buildPianoKeyEvents(notes), [notes])
+  const midiEvents = useMemo(() => buildMidiPlaybackEvents(notes), [notes])
   const beatsPerMeasure = useMemo(
     () => parseBeatsPerMeasure(score?.timeSignature ?? '4/4'),
     [score?.timeSignature],
@@ -128,9 +129,11 @@ export function FallingNotes({ score }: FallingNotesProps) {
   useEffect(() => {
     if (!isPlaying) {
       lastFrameAtRef.current = null
-      stopAll(activeOscillatorsRef.current)
+      stopInstrument()
       return
     }
+
+    playSustainingNotesAtBeat(notes, currentBeatRef.current)
 
     let frame = 0
     const tick = (now: number) => {
@@ -147,7 +150,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
         renderStartBeatRef.current,
         pixelsPerBeatRef.current,
       )
-      playDueNotes(notes, nextBeat, bpmRef.current, audioRef, activeOscillatorsRef, nextNoteIndexRef)
+      processMidiPlaybackEvents(midiEvents, nextBeat, nextMidiEventIndexRef)
       processPianoKeyEvents(
         pianoKeyEvents,
         nextBeat,
@@ -185,18 +188,18 @@ export function FallingNotes({ score }: FallingNotesProps) {
       cancelAnimationFrame(frame)
       lastFrameAtRef.current = null
     }
-  }, [isPlaying, notes, pianoKeyEvents, score?.pieceId, setCurrentBeat, startRenderTransition])
+  }, [isPlaying, midiEvents, notes, pianoKeyEvents, score?.pieceId, setCurrentBeat, startRenderTransition])
 
   useEffect(() => {
     currentBeatRef.current = 0
-    nextNoteIndexRef.current = 0
+    nextMidiEventIndexRef.current = 0
     nextKeyEventIndexRef.current = 0
     activePitchCountsRef.current.clear()
     lastFrameAtRef.current = null
     setCurrentBeat(0)
     setRenderWindow({ pieceId: score?.pieceId, beat: 0 })
     pianoKeyboardRef.current?.reset()
-    stopAll(activeOscillatorsRef.current)
+    stopInstrument()
   }, [score?.pieceId, setCurrentBeat])
 
   useLayoutEffect(() => {
@@ -205,7 +208,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
     const targetBeat = Math.max(0, Math.min(seekRequest.beat, score?.totalBeats ?? 0))
     currentBeatRef.current = targetBeat
     lastFrameAtRef.current = null
-    nextNoteIndexRef.current = lowerBoundNoteStart(notes, targetBeat)
+    nextMidiEventIndexRef.current = lowerBoundMidiEvent(midiEvents, targetBeat)
     nextKeyEventIndexRef.current = 0
     activePitchCountsRef.current.clear()
     pianoKeyboardRef.current?.reset()
@@ -216,15 +219,9 @@ export function FallingNotes({ score }: FallingNotesProps) {
       activePitchCountsRef,
       pianoKeyboardRef.current,
     )
-    stopAll(activeOscillatorsRef.current)
+    stopInstrument()
     if (isPlayingRef.current) {
-      scheduleSustainingNotesAtSeek(
-        notes,
-        targetBeat,
-        bpmRef.current,
-        audioRef,
-        activeOscillatorsRef,
-      )
+      playSustainingNotesAtBeat(notes, targetBeat)
     }
     setCurrentBeat(targetBeat)
     if (beatLabelRef.current) {
@@ -234,7 +231,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
       pieceId: score?.pieceId,
       beat: Math.floor(targetBeat / beatsPerMeasure) * beatsPerMeasure,
     })
-  }, [beatsPerMeasure, notes, pianoKeyEvents, score?.pieceId, score?.totalBeats, seekRequest, setCurrentBeat])
+  }, [beatsPerMeasure, midiEvents, notes, pianoKeyEvents, score?.pieceId, score?.totalBeats, seekRequest, setCurrentBeat])
 
   useLayoutEffect(() => {
     updateTimelineTransform(timelineRef.current, currentBeatRef.current, renderStartBeat, pixelsPerBeat)
@@ -361,90 +358,55 @@ function updateTimelineTransform(
   timeline.style.transform = `translate3d(0, ${(currentBeat - renderStartBeat) * pixelsPerBeat}px, 0)`
 }
 
-function playDueNotes(
-  notes: ScoreNote[],
-  currentBeat: number,
-  bpm: number,
-  audioRef: MutableRefObject<AudioContext | null>,
-  activeRef: MutableRefObject<Map<string, OscillatorNode>>,
-  nextNoteIndexRef: MutableRefObject<number>,
-) {
-  if (notes.length === 0) return
-  const audio = audioRef.current ?? new AudioContext()
-  audioRef.current = audio
-  if (audio.state === 'suspended') {
-    void audio.resume()
+function buildMidiPlaybackEvents(notes: ScoreNote[]) {
+  const events: PlaybackMidiEvent[] = []
+  for (const note of notes) {
+    const channel = Math.max(0, Math.min(15, note.track))
+    const pitch = Math.max(0, Math.min(127, note.pitch))
+    const velocity = Math.max(1, Math.min(127, note.velocity))
+    events.push({
+      beat: note.startBeat,
+      event: { type: 'noteOn', channel, note: pitch, velocity },
+    })
+    events.push({
+      beat: note.startBeat + note.durationBeats,
+      event: { type: 'noteOff', channel, note: pitch, velocity: 0 },
+    })
   }
+  return events.toSorted(
+    (first, second) =>
+      first.beat - second.beat ||
+      Number(first.event.type !== 'noteOff') - Number(second.event.type !== 'noteOff'),
+  )
+}
 
-  const scheduleAheadBeats = (audioScheduleAheadSeconds * bpm) / 60
+function processMidiPlaybackEvents(
+  events: PlaybackMidiEvent[],
+  currentBeat: number,
+  nextEventIndexRef: { current: number },
+) {
+  const due: MidiEvent[] = []
   while (
-    nextNoteIndexRef.current < notes.length &&
-    notes[nextNoteIndexRef.current].startBeat <= currentBeat + scheduleAheadBeats
+    nextEventIndexRef.current < events.length &&
+    events[nextEventIndexRef.current].beat <= currentBeat
   ) {
-    const note = notes[nextNoteIndexRef.current]
-    nextNoteIndexRef.current += 1
-    const endBeat = note.startBeat + note.durationBeats
-    if (currentBeat > endBeat || activeRef.current.has(note.id)) {
-      continue
-    }
-
-    scheduleNote(audio, note, currentBeat, bpm, activeRef)
+    due.push(events[nextEventIndexRef.current].event)
+    nextEventIndexRef.current += 1
   }
+  sendMidiEvents(due)
 }
 
-function scheduleNote(
-  audio: AudioContext,
-  note: ScoreNote,
-  currentBeat: number,
-  bpm: number,
-  activeRef: MutableRefObject<Map<string, OscillatorNode>>,
-) {
-  const startDelay = Math.max(0, ((note.startBeat - currentBeat) * 60) / bpm)
-  const duration = remainingSeconds(note, Math.max(currentBeat, note.startBeat), bpm)
-  const startAt = audio.currentTime + startDelay
-  const oscillator = audio.createOscillator()
-  const gain = audio.createGain()
-  const sustainGain = Math.max(0.04, Math.min(0.22, note.velocity / 480))
-  const endAt = startAt + duration
-  const envelopeSeconds = audioAttackSeconds + audioReleaseSeconds
-
-  oscillator.type = 'sine'
-  oscillator.frequency.value = midiToFrequency(note.pitch)
-  gain.gain.setValueAtTime(silentGain, startAt)
-  if (duration <= envelopeSeconds) {
-    gain.gain.linearRampToValueAtTime(sustainGain, startAt + duration / 2)
-  } else {
-    const attackEndAt = startAt + audioAttackSeconds
-    const releaseStartAt = endAt - audioReleaseSeconds
-    gain.gain.linearRampToValueAtTime(sustainGain, attackEndAt)
-    gain.gain.setValueAtTime(sustainGain, releaseStartAt)
-  }
-  gain.gain.exponentialRampToValueAtTime(silentGain, endAt)
-  oscillator.connect(gain)
-  gain.connect(audio.destination)
-  oscillator.start(startAt)
-  oscillator.stop(endAt)
-  oscillator.onended = () => activeRef.current.delete(note.id)
-  activeRef.current.set(note.id, oscillator)
+function sendMidiEvents(events: MidiEvent[]) {
+  if (events.length === 0) return
+  void instrumentOutput.send(events).catch((error: unknown) => {
+    console.error('Unable to send MIDI events', error)
+  })
 }
 
-function remainingSeconds(note: ScoreNote, currentBeat: number, bpm: number) {
-  return Math.max(0.05, ((note.startBeat + note.durationBeats - currentBeat) * 60) / bpm)
-}
-
-function midiToFrequency(pitch: number) {
-  return 440 * 2 ** ((pitch - 69) / 12)
-}
-
-function stopAll(active: Map<string, OscillatorNode>) {
-  for (const oscillator of active.values()) {
-    try {
-      oscillator.stop()
-    } catch {
-      // already stopped
-    }
-  }
-  active.clear()
+function stopInstrument() {
+  void instrumentOutput.stopAll().catch((error: unknown) => {
+    console.error('Unable to stop audio output', error)
+  })
 }
 
 function buildMeasureGuides(totalBeats: number, timeSignature: string): MeasureGuide[] {
@@ -489,12 +451,12 @@ function processPianoKeyEvents(
   if (changes.size > 0) keyboard.applyKeyStates(changes)
 }
 
-function lowerBoundNoteStart(notes: ScoreNote[], targetBeat: number) {
+function lowerBoundMidiEvent(events: PlaybackMidiEvent[], targetBeat: number) {
   let low = 0
-  let high = notes.length
+  let high = events.length
   while (low < high) {
     const middle = low + Math.floor((high - low) / 2)
-    if (notes[middle].startBeat < targetBeat) {
+    if (events[middle].beat < targetBeat) {
       low = middle + 1
     } else {
       high = middle
@@ -503,23 +465,17 @@ function lowerBoundNoteStart(notes: ScoreNote[], targetBeat: number) {
   return low
 }
 
-function scheduleSustainingNotesAtSeek(
-  notes: ScoreNote[],
-  targetBeat: number,
-  bpm: number,
-  audioRef: MutableRefObject<AudioContext | null>,
-  activeRef: MutableRefObject<Map<string, OscillatorNode>>,
-) {
-  const sustainingNotes: ScoreNote[] = []
+function playSustainingNotesAtBeat(notes: ScoreNote[], targetBeat: number) {
+  const events: MidiEvent[] = []
   for (const note of notes) {
     if (note.startBeat >= targetBeat) break
-    if (note.startBeat + note.durationBeats > targetBeat) sustainingNotes.push(note)
+    if (note.startBeat + note.durationBeats <= targetBeat) continue
+    events.push({
+      type: 'noteOn',
+      channel: Math.max(0, Math.min(15, note.track)),
+      note: Math.max(0, Math.min(127, note.pitch)),
+      velocity: Math.max(1, Math.min(127, note.velocity)),
+    })
   }
-  if (sustainingNotes.length === 0) return
-
-  const audio = audioRef.current ?? new AudioContext()
-  audioRef.current = audio
-  for (const note of sustainingNotes) {
-    scheduleNote(audio, note, targetBeat, bpm, activeRef)
-  }
+  sendMidiEvents(events)
 }
