@@ -6,6 +6,7 @@ import { PieceCard } from '../features/library/PieceCard'
 export function LibraryPage() {
   const queryClient = useQueryClient()
   const [message, setMessage] = useState<string | null>(null)
+  const [confirmingPieceId, setConfirmingPieceId] = useState<string | null>(null)
 
   const { data: pieces = [], isError, error } = useQuery({
     queryKey: ['pieces'],
@@ -19,9 +20,10 @@ export function LibraryPage() {
     mutationFn: scoreApi.addWatchPaths,
     onSuccess: (report) => {
       setMessage(
-        `扫描 ${report.discoveredFiles} 个 MIDI，新增 ${report.registeredFiles} 首曲目`,
+        `扫描 ${report.discoveredFiles} 个 MIDI，新增 ${report.registeredFiles} 首，更新 ${report.updatedFiles} 首`,
       )
       void queryClient.invalidateQueries({ queryKey: ['pieces'] })
+      void queryClient.invalidateQueries({ queryKey: ['piece-score'] })
       void queryClient.invalidateQueries({ queryKey: ['watch-paths'] })
     },
     onError: (mutationError) => {
@@ -45,15 +47,53 @@ export function LibraryPage() {
     mutationFn: scoreApi.refreshLocalLibrary,
     onSuccess: (report) => {
       setMessage(
-        `刷新完成：发现 ${report.discoveredFiles} 个 MIDI，新增 ${report.registeredFiles} 首`,
+        `刷新完成：发现 ${report.discoveredFiles} 个 MIDI，新增 ${report.registeredFiles} 首，更新 ${report.updatedFiles} 首`,
       )
       void queryClient.invalidateQueries({ queryKey: ['pieces'] })
+      void queryClient.invalidateQueries({ queryKey: ['piece-score'] })
       void queryClient.invalidateQueries({ queryKey: ['watch-paths'] })
     },
     onError: (mutationError) => {
       setMessage(mutationError instanceof Error ? mutationError.message : '刷新失败')
     },
   })
+  const removePiece = useMutation({
+    mutationFn: (piece: (typeof pieces)[number]) => scoreApi.deletePiece(piece.id),
+    onMutate: async (removedPiece) => {
+      await queryClient.cancelQueries({ queryKey: ['pieces'] })
+      const previousPieces = queryClient.getQueryData<typeof pieces>(['pieces'])
+      queryClient.setQueryData(
+        ['pieces'],
+        (current: typeof pieces | undefined) =>
+          current?.filter(
+            (piece) =>
+              piece.id !== removedPiece.id &&
+              piece.sourcePath !== removedPiece.sourcePath,
+          ) ?? [],
+      )
+      return { previousPieces }
+    },
+    onSuccess: (_result, removedPiece) => {
+      setConfirmingPieceId(null)
+      setMessage('已从曲库移除。源 MIDI 文件仍保留，刷新曲库可重新导入。')
+      queryClient.removeQueries({ queryKey: ['piece-score', removedPiece.id] })
+    },
+    onError: (mutationError, _removedPiece, context) => {
+      if (context?.previousPieces) {
+        queryClient.setQueryData(['pieces'], context.previousPieces)
+      }
+      setMessage(mutationError instanceof Error ? mutationError.message : '移除失败')
+    },
+  })
+
+  const requestRemove = (piece: (typeof pieces)[number]) => {
+    if (confirmingPieceId === piece.id) {
+      removePiece.mutate(piece)
+      return
+    }
+    setConfirmingPieceId(piece.id)
+    setMessage('确认后只移除曲库记录，不会删除源 MIDI 文件。')
+  }
 
   return (
     <div className="p-6 max-[720px]:p-4">
@@ -117,7 +157,19 @@ export function LibraryPage() {
 
       <section className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-4">
         {pieces.length > 0 ? (
-          pieces.map((piece) => <PieceCard key={piece.id} piece={piece} />)
+          pieces.map((piece) => (
+            <PieceCard
+              key={piece.id}
+              piece={piece}
+              onRemove={requestRemove}
+              onCancelRemove={() => setConfirmingPieceId(null)}
+              confirmingRemove={confirmingPieceId === piece.id}
+              removing={
+                removePiece.isPending &&
+                removePiece.variables?.sourcePath === piece.sourcePath
+              }
+            />
+          ))
         ) : (
           <div className="rounded-lg bg-card p-5 text-sm text-muted-foreground shadow-medium">
             还没有 MIDI 曲目。选择一个包含 .mid 或 .midi 文件的本地文件夹。

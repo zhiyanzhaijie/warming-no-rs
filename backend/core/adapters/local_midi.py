@@ -1,4 +1,5 @@
 import os
+import hashlib
 import threading
 from pathlib import Path
 
@@ -100,10 +101,11 @@ def is_valid_midi_file(path: Path) -> bool:
 
 def discovered_midi_file(path: Path) -> DiscoveredMidiFile:
     stat = path.stat()
+    fingerprint = hashlib.sha256(path.read_bytes()).hexdigest()
     return DiscoveredMidiFile(
         path=str(path),
         title=path.stem.strip() or str(path),
-        fingerprint=f"{path}:{stat.st_size}:{int(stat.st_mtime)}",
+        fingerprint=fingerprint,
         size_bytes=stat.st_size,
         modified_at=str(int(stat.st_mtime)),
     )

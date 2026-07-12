@@ -51,6 +51,24 @@ class MusicCommandHandler:
         self._pieces.save_piece(piece)
         return piece
 
+    def delete_piece(self, piece_id: MusicPieceId) -> None:
+        piece = self._pieces.find_piece(piece_id)
+        if piece is None:
+            raise AppError.not_found("music piece not found")
+        source_paths = {
+            arrangement.source_path for arrangement in piece.arrangements
+        }
+        matching_ids = [
+            candidate.id
+            for candidate in self._pieces.list_pieces()
+            if any(
+                arrangement.source_path in source_paths
+                for arrangement in candidate.arrangements
+            )
+        ]
+        for matching_id in matching_ids:
+            self._pieces.delete_piece(matching_id)
+
     def import_arrangement(self, command: ImportPianoArrangementCommand) -> PianoArrangement:
         piece = self._pieces.find_piece(command.piece_id)
         if piece is None:

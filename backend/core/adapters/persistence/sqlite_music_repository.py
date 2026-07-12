@@ -89,6 +89,14 @@ class SqliteMusicPieceRepository:
             ).fetchall()
             return [self._piece_from_row(connection, row) for row in rows]
 
+    def delete_piece(self, piece_id: MusicPieceId) -> bool:
+        with self._lock, self._connect() as connection:
+            cursor = connection.execute(
+                "delete from music_pieces where id = ?",
+                (piece_id.value,),
+            )
+            return cursor.rowcount > 0
+
     def list_watch_paths(self) -> list[str]:
         with self._lock, self._connect() as connection:
             rows = connection.execute(

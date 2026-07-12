@@ -42,6 +42,14 @@ class JsonMusicPieceRepository:
             ]
             return sorted(pieces, key=lambda item: item.title.lower())
 
+    def delete_piece(self, piece_id: MusicPieceId) -> bool:
+        with self._lock:
+            data = self._read()
+            removed = data.setdefault("pieces", {}).pop(piece_id.value, None)
+            if removed is not None:
+                self._write(data)
+            return removed is not None
+
     def list_watch_paths(self) -> list[str]:
         with self._lock:
             return list(self._read().get("watch_paths", []))

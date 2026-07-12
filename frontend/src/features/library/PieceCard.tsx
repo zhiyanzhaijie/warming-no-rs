@@ -1,11 +1,22 @@
 import { Link } from 'react-router-dom'
 import type { Piece } from '../../shared/types/domain'
+import { Trash2 } from 'lucide-react'
 
 type PieceCardProps = {
   piece: Piece
+  onRemove: (piece: Piece) => void
+  onCancelRemove: () => void
+  confirmingRemove?: boolean
+  removing?: boolean
 }
 
-export function PieceCard({ piece }: PieceCardProps) {
+export function PieceCard({
+  piece,
+  onRemove,
+  onCancelRemove,
+  confirmingRemove = false,
+  removing = false,
+}: PieceCardProps) {
   return (
     <article className="rounded-lg bg-card p-4 transition hover:bg-dark-card hover:shadow-medium">
       <div className="flex items-start justify-between gap-4">
@@ -66,6 +77,36 @@ export function PieceCard({ piece }: PieceCardProps) {
         >
           练习
         </Link>
+        {confirmingRemove ? (
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              disabled={removing}
+              onClick={onCancelRemove}
+              className="rounded-full bg-secondary px-3 py-2 text-xs font-bold text-muted-foreground hover:text-foreground disabled:opacity-50"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              disabled={removing}
+              onClick={() => onRemove(piece)}
+              className="rounded-full bg-destructive px-3 py-2 text-xs font-bold text-background disabled:cursor-wait disabled:opacity-60"
+            >
+              {removing ? '正在移除' : '确认移除'}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onRemove(piece)}
+            className="ml-auto grid size-9 place-items-center rounded-full bg-secondary text-muted-foreground transition hover:bg-destructive hover:text-background"
+            aria-label={`从曲库移除 ${piece.title}`}
+            title="从曲库移除"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        )}
       </div>
     </article>
   )

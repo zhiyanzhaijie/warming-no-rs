@@ -20,6 +20,7 @@ export type MidiScanReport = {
   watchedPaths: string[]
   discoveredFiles: number
   registeredFiles: number
+  updatedFiles: number
 }
 
 export type ScoreNote = {

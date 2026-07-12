@@ -29,6 +29,7 @@ pub fn run() {
             python_sidecar::music_list_pieces,
             python_sidecar::music_get_piece,
             python_sidecar::music_get_piece_score,
+            python_sidecar::music_delete_piece,
             python_sidecar::music_list_watch_paths,
             python_sidecar::music_add_watch_path,
             python_sidecar::music_add_watch_paths,

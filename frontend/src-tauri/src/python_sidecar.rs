@@ -165,6 +165,11 @@ pub fn music_get_piece_score(piece_id: String) -> Result<Value, String> {
 }
 
 #[tauri::command]
+pub fn music_delete_piece(piece_id: String) -> Result<Value, String> {
+    call("music_delete_piece", json!({ "piece_id": piece_id }))
+}
+
+#[tauri::command]
 pub fn music_list_watch_paths() -> Result<Value, String> {
     call("music_list_watch_paths", json!({}))
 }

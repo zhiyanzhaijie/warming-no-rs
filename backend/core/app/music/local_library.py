@@ -28,6 +28,7 @@ class RegisterLocalMidiFileCommand:
 class RegisterLocalMidiFileResult:
     piece: MusicPiece
     created: bool
+    updated: bool = False
 
 
 class LocalMidiLibraryHandler:
@@ -67,6 +68,7 @@ class LocalMidiLibraryHandler:
         paths = self._watcher.watched_paths()
         discovered_files = 0
         registered_files = 0
+        updated_files = 0
 
         for path in paths:
             files = self._scanner.scan_path(path)
@@ -80,29 +82,56 @@ class LocalMidiLibraryHandler:
                 )
                 if result.created:
                     registered_files += 1
+                elif result.updated:
+                    updated_files += 1
 
         self._watcher.clear_dirty()
         return MidiScanReport(
             watched_paths=paths,
             discovered_files=discovered_files,
             registered_files=registered_files,
+            updated_files=updated_files,
         )
 
     def register_local_midi_file(
         self, command: RegisterLocalMidiFileCommand
     ) -> RegisterLocalMidiFileResult:
-        piece_id = local_midi_piece_id(command.file.fingerprint)
-        arrangement_id = local_midi_arrangement_id(command.file.fingerprint)
+        piece_id = local_midi_piece_id(command.file.path)
+        arrangement_id = local_midi_arrangement_id(command.file.path)
         existing = self._pieces.find_piece(piece_id)
+        if existing is None:
+            existing = next(
+                (
+                    piece
+                    for piece in self._pieces.list_pieces()
+                    if any(
+                        arrangement.source_path == command.file.path
+                        for arrangement in piece.arrangements
+                    )
+                ),
+                None,
+            )
+            if existing is not None:
+                piece_id = existing.id
 
         existing_arrangement = None
         if existing:
             existing_arrangement = next(
-                (item for item in existing.arrangements if item.id == arrangement_id),
+                (
+                    item
+                    for item in existing.arrangements
+                    if item.source_path == command.file.path
+                ),
                 None,
             )
-        if existing_arrangement and existing_arrangement.score.notes:
-            return RegisterLocalMidiFileResult(piece=existing, created=False)
+        if (
+            existing_arrangement
+            and existing_arrangement.fingerprint == command.file.fingerprint
+            and existing_arrangement.score.notes
+        ):
+            return RegisterLocalMidiFileResult(
+                piece=existing, created=False, updated=False
+            )
 
         try:
             score = self._parser.parse_score(command.file.path)
@@ -126,7 +155,11 @@ class LocalMidiLibraryHandler:
         self._music_command.import_arrangement(
             ImportPianoArrangementCommand(
                 piece_id=piece.id,
-                arrangement_id=arrangement_id,
+                arrangement_id=(
+                    existing_arrangement.id
+                    if existing_arrangement is not None
+                    else arrangement_id
+                ),
                 title="MIDI import",
                 source_path=command.file.path,
                 fingerprint=command.file.fingerprint,
@@ -135,16 +168,20 @@ class LocalMidiLibraryHandler:
             )
         )
         updated = self._pieces.find_piece(piece.id) or piece
-        return RegisterLocalMidiFileResult(piece=updated, created=created)
+        return RegisterLocalMidiFileResult(
+            piece=updated,
+            created=created,
+            updated=not created,
+        )
 
 
-def local_midi_piece_id(fingerprint: str) -> MusicPieceId:
-    digest = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16]
+def local_midi_piece_id(path: str) -> MusicPieceId:
+    digest = hashlib.sha256(path.encode("utf-8")).hexdigest()[:16]
     return MusicPieceId.parse(f"midi-{digest}")
 
 
-def local_midi_arrangement_id(fingerprint: str) -> ArrangementId:
-    digest = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16]
+def local_midi_arrangement_id(path: str) -> ArrangementId:
+    digest = hashlib.sha256(path.encode("utf-8")).hexdigest()[:16]
     return ArrangementId.parse(f"midi-arrangement-{digest}")
 
 

@@ -55,6 +55,9 @@ export const apiClient = {
   getPieceScore(pieceId: string) {
     return invoke<PieceScore>('music_get_piece_score', { pieceId })
   },
+  deletePiece(pieceId: string) {
+    return invoke<{ deleted: boolean }>('music_delete_piece', { pieceId })
+  },
   listWatchPaths() {
     return invoke<{ paths: string[] }>('music_list_watch_paths')
   },

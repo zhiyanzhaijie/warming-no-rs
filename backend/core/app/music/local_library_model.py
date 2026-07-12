@@ -15,3 +15,4 @@ class MidiScanReport:
     watched_paths: list[str]
     discovered_files: int
     registered_files: int
+    updated_files: int = 0

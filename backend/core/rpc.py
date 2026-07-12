@@ -35,7 +35,6 @@ def handle_line(line: str) -> dict[str, Any]:
 
 def dispatch(method: str, params: dict[str, Any]) -> Any:
     if method == "music_list_pieces":
-        container.music.local_library.refresh_if_dirty()
         return [piece_response(piece) for piece in container.music.query.list_pieces()]
     if method == "music_get_piece":
         piece = container.music.query.get_piece(MusicPieceId.parse(params["piece_id"]))
@@ -47,6 +46,9 @@ def dispatch(method: str, params: dict[str, Any]) -> Any:
         if piece is None:
             raise AppError.not_found("piece not found")
         return piece_score_response(piece)
+    if method == "music_delete_piece":
+        container.music.command.delete_piece(MusicPieceId.parse(params["piece_id"]))
+        return {"deleted": True}
     if method == "music_list_watch_paths":
         return {"paths": container.music.local_library.list_watch_paths()}
     if method == "music_add_watch_path":
@@ -87,6 +89,7 @@ def scan_report_response(report: Any) -> dict[str, Any]:
         "watchedPaths": report.watched_paths,
         "discoveredFiles": report.discovered_files,
         "registeredFiles": report.registered_files,
+        "updatedFiles": report.updated_files,
     }
 
 
