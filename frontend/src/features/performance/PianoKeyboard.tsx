@@ -17,8 +17,10 @@ export type PianoKeyboardHandle = {
 
 export const PianoKeyboard = memo(function PianoKeyboard({
   ref,
+  keyLabels,
 }: {
   ref?: Ref<PianoKeyboardHandle>
+  keyLabels?: ReadonlyMap<number, string>
 }) {
   const [keyStates, setKeyStates] = useState<ReadonlyMap<number, PianoKeyState>>(() => new Map())
 
@@ -43,10 +45,20 @@ export const PianoKeyboard = memo(function PianoKeyboard({
       }}
     >
       {whitePianoKeys.map((key) => (
-        <PianoKey key={key.pitch} geometry={key} state={keyStates.get(key.pitch) ?? 'idle'} />
+        <PianoKey
+          key={key.pitch}
+          geometry={key}
+          state={keyStates.get(key.pitch) ?? 'idle'}
+          label={keyLabels?.get(key.pitch)}
+        />
       ))}
       {blackPianoKeys.map((key) => (
-        <PianoKey key={key.pitch} geometry={key} state={keyStates.get(key.pitch) ?? 'idle'} />
+        <PianoKey
+          key={key.pitch}
+          geometry={key}
+          state={keyStates.get(key.pitch) ?? 'idle'}
+          label={keyLabels?.get(key.pitch)}
+        />
       ))}
     </div>
   )
@@ -67,9 +79,11 @@ function applyChanges(
 const PianoKey = memo(function PianoKey({
   geometry,
   state,
+  label,
 }: {
   geometry: PianoKeyGeometry
   state: PianoKeyState
+  label?: string
 }) {
   const { isBlack, leftPercent, widthPercent } = geometry
   return (
@@ -92,9 +106,25 @@ const PianoKey = memo(function PianoKey({
         <span
           className={cn(
             'pointer-events-none absolute left-1/2 size-[clamp(4px,0.55vw,8px)] -translate-x-1/2 rounded-full bg-spotify-green',
-            isBlack ? 'bottom-[18%]' : 'bottom-[14%]',
+            label
+              ? isBlack
+                ? 'bottom-[35%]'
+                : 'bottom-[25%]'
+              : isBlack
+                ? 'bottom-[18%]'
+                : 'bottom-[14%]',
           )}
         />
+      ) : null}
+      {label ? (
+        <span
+          className={cn(
+            'pointer-events-none absolute bottom-[8%] left-1/2 -translate-x-1/2 text-[clamp(7px,0.65vw,10px)] font-bold leading-none',
+            isBlack ? 'text-white/75' : 'text-black/55',
+          )}
+        >
+          {label}
+        </span>
       ) : null}
     </div>
   )

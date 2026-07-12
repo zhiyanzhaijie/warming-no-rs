@@ -12,6 +12,8 @@ from core.domain.music import (
     PianoArrangement,
     PianoScore,
     ScorePart,
+    HAND_ANALYSIS_VERSION,
+    assign_hands,
 )
 
 
@@ -154,49 +156,77 @@ class SqliteMusicPieceRepository:
             """,
             (piece.id.value,),
         ).fetchall()
-        piece.arrangements = [
-            PianoArrangement(
+        piece.arrangements = []
+        for item in arrangements:
+            raw_score = json.loads(item["score_json"])
+            score = score_from_dict(raw_score)
+            if raw_score.get("hand_analysis_version") != score.hand_analysis_version:
+                connection.execute(
+                    "update piano_arrangements set score_json = ? where id = ?",
+                    (json.dumps(score_to_dict(score), ensure_ascii=False), item["id"]),
+                )
+            piece.arrangements.append(PianoArrangement(
                 id=ArrangementId.parse(item["id"]),
                 piece_id=MusicPieceId.parse(item["piece_id"]),
                 title=item["title"],
                 source_path=item["source_path"],
                 fingerprint=item["fingerprint"],
-                score=score_from_dict(json.loads(item["score_json"])),
-            )
-            for item in arrangements
-        ]
+                score=score,
+            ))
         return piece
 
 
 def score_to_dict(score: PianoScore) -> dict[str, Any]:
     return {
         "parts": [
-            {"name": part.name, "note_count": part.note_count}
+            {
+                "track": part.track,
+                "name": part.name,
+                "note_count": part.note_count,
+                "instrument_name": part.instrument_name,
+                "channels": list(part.channels),
+                "hand": part.hand,
+                "hand_confidence": part.hand_confidence,
+            }
             for part in score.parts
         ],
         "notes": [
             {
                 "pitch": note.pitch,
+                "id": note.id,
                 "start_beats": note.start_beats,
                 "duration_beats": note.duration_beats,
                 "velocity": note.velocity,
                 "track": note.track,
+                "channel": note.channel,
+                "hand": note.hand,
+                "hand_confidence": note.hand_confidence,
             }
             for note in score.notes
         ],
         "tempos": score.tempos,
         "meters": score.meters,
+        "hand_analysis_version": score.hand_analysis_version,
     }
 
 
 def score_from_dict(data: dict[str, Any]) -> PianoScore:
-    return PianoScore(
+    score = PianoScore(
         parts=[
-            ScorePart(name=part["name"], note_count=int(part.get("note_count", 0)))
-            for part in data.get("parts", [])
+            ScorePart(
+                track=int(part.get("track", index)),
+                name=part["name"],
+                note_count=int(part.get("note_count", 0)),
+                instrument_name=part.get("instrument_name"),
+                channels=tuple(int(value) for value in part.get("channels", [])),
+                hand=part.get("hand", "unknown"),
+                hand_confidence=float(part.get("hand_confidence", 0.0)),
+            )
+            for index, part in enumerate(data.get("parts", []))
         ],
         notes=[
             NoteEvent(
+                id=note.get("id", f"legacy-{index}"),
                 pitch=int(note["pitch"]),
                 start_beats=float(note["start_beats"]),
                 duration_beats=float(note["duration_beats"]),
@@ -206,9 +236,16 @@ def score_from_dict(data: dict[str, Any]) -> PianoScore:
                     else None
                 ),
                 track=int(note.get("track", 0)),
+                channel=int(note.get("channel", 0)),
+                hand=note.get("hand", "unknown"),
+                hand_confidence=float(note.get("hand_confidence", 0.0)),
             )
-            for note in data.get("notes", [])
+            for index, note in enumerate(data.get("notes", []))
         ],
         tempos=[float(value) for value in data.get("tempos", [])],
         meters=list(data.get("meters", [])),
+        hand_analysis_version=data.get("hand_analysis_version"),
     )
+    if score.hand_analysis_version != HAND_ANALYSIS_VERSION:
+        return assign_hands(score)
+    return score

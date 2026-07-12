@@ -1,4 +1,4 @@
-export type PracticeMode = 'listen' | 'right-hand' | 'left-hand' | 'both-hands'
+export type PracticeMode = 'listen' | 'free' | 'right-hand' | 'left-hand' | 'both-hands'
 
 export type Piece = {
   id: string
@@ -29,6 +29,9 @@ export type ScoreNote = {
   durationBeats: number
   velocity: number
   track: number
+  channel: number
+  hand: 'left' | 'right' | 'unknown'
+  handConfidence: number
 }
 
 export type PieceScore = {
@@ -38,6 +41,8 @@ export type PieceScore = {
   timeSignature: string
   totalBeats: number
   notes: ScoreNote[]
+  handAnalysisVersion: string | null
+  handConfidence: number
 }
 
 export type PracticeReport = {

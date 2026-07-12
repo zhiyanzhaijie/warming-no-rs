@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Bot } from 'lucide-react'
 import { scoreApi } from '../api/score'
@@ -22,12 +22,14 @@ export function PracticePage() {
   const [params] = useSearchParams()
   const requestedPieceId = params.get('pieceId')
   const setBpm = usePracticeStore((state) => state.setBpm)
+  const mode = usePracticeStore((state) => state.mode)
+  const setMode = usePracticeStore((state) => state.setMode)
   const { data: pieces = [] } = useQuery({
     queryKey: ['pieces'],
     queryFn: scoreApi.listPieces,
   })
   const pieceId = requestedPieceId ?? pieces[0]?.id
-  const { data: score } = useQuery({
+  const { data: score, refetch: refetchScore } = useQuery({
     queryKey: ['piece-score', pieceId],
     queryFn: () => scoreApi.getPieceScore(pieceId ?? ''),
     enabled: Boolean(pieceId),
@@ -38,6 +40,23 @@ export function PracticePage() {
       setBpm(score.tempoBpm)
     }
   }, [score?.tempoBpm, setBpm])
+
+  useEffect(() => {
+    if (mode !== 'listen' && pieceId) void refetchScore()
+  }, [mode, pieceId, refetchScore])
+
+  const availableHands = useMemo(() => {
+    const hands = new Set<'left' | 'right'>()
+    for (const note of score?.notes ?? []) {
+      if (note.hand === 'left' || note.hand === 'right') hands.add(note.hand)
+    }
+    return hands
+  }, [score?.notes])
+
+  useEffect(() => {
+    if (mode === 'left-hand' && !availableHands.has('left')) setMode('listen')
+    if (mode === 'right-hand' && !availableHands.has('right')) setMode('listen')
+  }, [availableHands, mode, setMode])
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-3 max-[720px]:p-2">
@@ -52,7 +71,7 @@ export function PracticePage() {
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
-          <TransportControls compact />
+          <TransportControls compact availableHands={availableHands} />
           <Sheet>
             <SheetTrigger asChild>
               <Button

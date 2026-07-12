@@ -5,17 +5,26 @@ from .value_object import ArrangementId, MusicPieceId
 
 @dataclass(frozen=True)
 class NoteEvent:
+    id: str
     pitch: int
     start_beats: float
     duration_beats: float
     velocity: int | None = None
     track: int = 0
+    channel: int = 0
+    hand: str = "unknown"
+    hand_confidence: float = 0.0
 
 
 @dataclass(frozen=True)
 class ScorePart:
+    track: int
     name: str
     note_count: int = 0
+    instrument_name: str | None = None
+    channels: tuple[int, ...] = ()
+    hand: str = "unknown"
+    hand_confidence: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -24,6 +33,7 @@ class PianoScore:
     notes: list[NoteEvent] = field(default_factory=list)
     tempos: list[float] = field(default_factory=list)
     meters: list[str] = field(default_factory=list)
+    hand_analysis_version: str | None = None
 
     @property
     def note_count(self) -> int:

@@ -1,7 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type { CSSProperties, MutableRefObject } from 'react'
-import type { PieceScore, ScoreNote } from '../../shared/types/domain'
+import type { PieceScore, PracticeMode, ScoreNote } from '../../shared/types/domain'
 import { instrumentOutput, type MidiEvent } from '../../api/instrument'
+import { useComputerKeyboard } from '../instrument/useComputerKeyboard'
+import { computerKeyboardLabelByPitch } from '../instrument/computerKeyboardLayout'
 import { buildMeasureTimings, parseBeatsPerMeasure } from '../practice/measureTiming'
 import { usePracticeStore } from '../practice/practiceStore'
 import { cn } from '@/lib/utils'
@@ -38,6 +40,17 @@ type PlaybackMidiEvent = {
   event: MidiEvent
 }
 
+type PracticeTargetGroup = {
+  beat: number
+  pitches: Set<number>
+}
+
+type HandParts = {
+  left: ScoreNote[]
+  right: ScoreNote[]
+  unknown: ScoreNote[]
+}
+
 const octaveGuides = buildPitchGuides(0)
 const innerPitchGuides = buildPitchGuides(5)
 const beatLabelIntervalMs = 250
@@ -48,6 +61,7 @@ const renderBehindMeasureCount = 2
 export function FallingNotes({ score }: FallingNotesProps) {
   const bpm = usePracticeStore((state) => state.bpm)
   const isPlaying = usePracticeStore((state) => state.isPlaying)
+  const mode = usePracticeStore((state) => state.mode)
   const seekRequest = usePracticeStore((state) => state.seekRequest)
   const setCurrentBeat = usePracticeStore((state) => state.setCurrentBeat)
   const [pixelsPerBeat, setPixelsPerBeat] = useState(88)
@@ -70,14 +84,33 @@ export function FallingNotes({ score }: FallingNotesProps) {
   const lastBeatLabelAtRef = useRef(0)
   const nextMidiEventIndexRef = useRef(0)
   const nextKeyEventIndexRef = useRef(0)
+  const nextTargetGroupIndexRef = useRef(0)
+  const waitingPitchesRef = useRef<Set<number> | null>(null)
   const activePitchCountsRef = useRef<Map<number, number>>(new Map())
 
   const notes = useMemo(
     () => (score?.notes ?? []).toSorted((a, b) => a.startBeat - b.startBeat),
     [score?.notes],
   )
-  const pianoKeyEvents = useMemo(() => buildPianoKeyEvents(notes), [notes])
-  const midiEvents = useMemo(() => buildMidiPlaybackEvents(notes), [notes])
+  const handParts = useMemo(() => partitionNotesByHand(notes), [notes])
+  const modeParts = useMemo(() => selectModeParts(notes, handParts, mode), [handParts, mode, notes])
+  const autoPlayNotes = modeParts.autoPlay
+  const targetGroups = useMemo(() => buildPracticeTargetGroups(modeParts.user), [modeParts.user])
+  const pianoKeyEvents = useMemo(() => buildPianoKeyEvents(autoPlayNotes), [autoPlayNotes])
+  const midiEvents = useMemo(() => buildMidiPlaybackEvents(autoPlayNotes), [autoPlayNotes])
+  const handleUserNoteOn = useCallback((pitch: number) => {
+    const waiting = waitingPitchesRef.current
+    if (!waiting?.delete(pitch)) return
+    if (waiting.size === 0) {
+      waitingPitchesRef.current = null
+      nextTargetGroupIndexRef.current += 1
+    }
+  }, [])
+  useComputerKeyboard(
+    mode === 'free' || (mode !== 'listen' && isPlaying),
+    pianoKeyboardRef,
+    handleUserNoteOn,
+  )
   const beatsPerMeasure = useMemo(
     () => parseBeatsPerMeasure(score?.timeSignature ?? '4/4'),
     [score?.timeSignature],
@@ -129,11 +162,16 @@ export function FallingNotes({ score }: FallingNotesProps) {
   useEffect(() => {
     if (!isPlaying) {
       lastFrameAtRef.current = null
+      waitingPitchesRef.current = null
+      nextTargetGroupIndexRef.current = lowerBoundTargetGroup(
+        targetGroups,
+        currentBeatRef.current,
+      )
       stopInstrument()
       return
     }
 
-    playSustainingNotesAtBeat(notes, currentBeatRef.current)
+    playSustainingNotesAtBeat(autoPlayNotes, currentBeatRef.current)
 
     let frame = 0
     const tick = (now: number) => {
@@ -141,7 +179,16 @@ export function FallingNotes({ score }: FallingNotesProps) {
       const elapsedSeconds = (now - lastFrameAt) / 1000
       lastFrameAtRef.current = now
 
-      const nextBeat = currentBeatRef.current + (elapsedSeconds * bpmRef.current) / 60
+      let nextBeat = currentBeatRef.current + (elapsedSeconds * bpmRef.current) / 60
+      if (mode !== 'listen') {
+        nextBeat = advancePracticeTimeline(
+          nextBeat,
+          targetGroups,
+          nextTargetGroupIndexRef,
+          waitingPitchesRef,
+          pianoKeyboardRef.current,
+        )
+      }
       currentBeatRef.current = nextBeat
 
       updateTimelineTransform(
@@ -188,19 +235,21 @@ export function FallingNotes({ score }: FallingNotesProps) {
       cancelAnimationFrame(frame)
       lastFrameAtRef.current = null
     }
-  }, [isPlaying, midiEvents, notes, pianoKeyEvents, score?.pieceId, setCurrentBeat, startRenderTransition])
+  }, [autoPlayNotes, isPlaying, midiEvents, mode, notes, pianoKeyEvents, score?.pieceId, setCurrentBeat, startRenderTransition, targetGroups])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     currentBeatRef.current = 0
     nextMidiEventIndexRef.current = 0
     nextKeyEventIndexRef.current = 0
+    nextTargetGroupIndexRef.current = 0
+    waitingPitchesRef.current = null
     activePitchCountsRef.current.clear()
     lastFrameAtRef.current = null
     setCurrentBeat(0)
     setRenderWindow({ pieceId: score?.pieceId, beat: 0 })
     pianoKeyboardRef.current?.reset()
     stopInstrument()
-  }, [score?.pieceId, setCurrentBeat])
+  }, [mode, score?.pieceId, setCurrentBeat])
 
   useLayoutEffect(() => {
     if (!seekRequest || seekRequest.pieceId !== score?.pieceId) return
@@ -210,6 +259,8 @@ export function FallingNotes({ score }: FallingNotesProps) {
     lastFrameAtRef.current = null
     nextMidiEventIndexRef.current = lowerBoundMidiEvent(midiEvents, targetBeat)
     nextKeyEventIndexRef.current = 0
+    nextTargetGroupIndexRef.current = lowerBoundTargetGroup(targetGroups, targetBeat)
+    waitingPitchesRef.current = null
     activePitchCountsRef.current.clear()
     pianoKeyboardRef.current?.reset()
     processPianoKeyEvents(
@@ -221,7 +272,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
     )
     stopInstrument()
     if (isPlayingRef.current) {
-      playSustainingNotesAtBeat(notes, targetBeat)
+      playSustainingNotesAtBeat(autoPlayNotes, targetBeat)
     }
     setCurrentBeat(targetBeat)
     if (beatLabelRef.current) {
@@ -231,7 +282,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
       pieceId: score?.pieceId,
       beat: Math.floor(targetBeat / beatsPerMeasure) * beatsPerMeasure,
     })
-  }, [beatsPerMeasure, midiEvents, notes, pianoKeyEvents, score?.pieceId, score?.totalBeats, seekRequest, setCurrentBeat])
+  }, [autoPlayNotes, beatsPerMeasure, midiEvents, notes, pianoKeyEvents, score?.pieceId, score?.totalBeats, seekRequest, setCurrentBeat, targetGroups])
 
   useLayoutEffect(() => {
     updateTimelineTransform(timelineRef.current, currentBeatRef.current, renderStartBeat, pixelsPerBeat)
@@ -302,7 +353,10 @@ export function FallingNotes({ score }: FallingNotesProps) {
         </div>
       </div>
 
-      <PianoKeyboard ref={pianoKeyboardRef} />
+      <PianoKeyboard
+        ref={pianoKeyboardRef}
+        keyLabels={mode === 'listen' ? undefined : computerKeyboardLabelByPitch}
+      />
     </section>
   )
 }
@@ -361,7 +415,7 @@ function updateTimelineTransform(
 function buildMidiPlaybackEvents(notes: ScoreNote[]) {
   const events: PlaybackMidiEvent[] = []
   for (const note of notes) {
-    const channel = Math.max(0, Math.min(15, note.track))
+    const channel = midiChannelForNote(note)
     const pitch = Math.max(0, Math.min(127, note.pitch))
     const velocity = Math.max(1, Math.min(127, note.velocity))
     events.push({
@@ -378,6 +432,79 @@ function buildMidiPlaybackEvents(notes: ScoreNote[]) {
       first.beat - second.beat ||
       Number(first.event.type !== 'noteOff') - Number(second.event.type !== 'noteOff'),
   )
+}
+
+function midiChannelForNote(note: ScoreNote) {
+  return Number.isInteger(note.channel) && note.channel >= 0 && note.channel <= 15
+    ? note.channel
+    : 0
+}
+
+function partitionNotesByHand(notes: ScoreNote[]): HandParts {
+  const parts: HandParts = { left: [], right: [], unknown: [] }
+  for (const note of notes) {
+    if (note.hand === 'left') parts.left.push(note)
+    else if (note.hand === 'right') parts.right.push(note)
+    else parts.unknown.push(note)
+  }
+  return parts
+}
+
+function selectModeParts(notes: ScoreNote[], parts: HandParts, mode: PracticeMode) {
+  if (mode === 'listen') return { autoPlay: notes, user: [] }
+  if (mode === 'right-hand') {
+    return { autoPlay: parts.left, user: parts.right }
+  }
+  if (mode === 'left-hand') {
+    return { autoPlay: parts.right, user: parts.left }
+  }
+  if (mode === 'both-hands') return { autoPlay: [], user: notes }
+  return { autoPlay: [], user: [] }
+}
+
+function buildPracticeTargetGroups(targets: ScoreNote[]) {
+  const groups: PracticeTargetGroup[] = []
+  for (const note of targets.toSorted((a, b) => a.startBeat - b.startBeat)) {
+    const previous = groups.at(-1)
+    if (!previous || note.startBeat - previous.beat > 0.08) {
+      groups.push({ beat: note.startBeat, pitches: new Set([note.pitch]) })
+      continue
+    }
+    previous.pitches.add(note.pitch)
+  }
+  return groups
+}
+
+function advancePracticeTimeline(
+  proposedBeat: number,
+  targetGroups: PracticeTargetGroup[],
+  nextTargetRef: MutableRefObject<number>,
+  waitingRef: MutableRefObject<Set<number> | null>,
+  keyboard: PianoKeyboardHandle | null,
+) {
+  const target = targetGroups[nextTargetRef.current]
+  if (!target) return proposedBeat
+  if (waitingRef.current) return target.beat
+  if (proposedBeat < target.beat) return proposedBeat
+
+  waitingRef.current = new Set(target.pitches)
+  keyboard?.applyKeyStates(
+    new Map(
+      Array.from(target.pitches, (pitch) => [pitch, 'guided' as PianoKeyState]),
+    ),
+  )
+  return target.beat
+}
+
+function lowerBoundTargetGroup(groups: PracticeTargetGroup[], targetBeat: number) {
+  let low = 0
+  let high = groups.length
+  while (low < high) {
+    const middle = low + Math.floor((high - low) / 2)
+    if (groups[middle].beat < targetBeat) low = middle + 1
+    else high = middle
+  }
+  return low
 }
 
 function processMidiPlaybackEvents(
@@ -472,7 +599,7 @@ function playSustainingNotesAtBeat(notes: ScoreNote[], targetBeat: number) {
     if (note.startBeat + note.durationBeats <= targetBeat) continue
     events.push({
       type: 'noteOn',
-      channel: Math.max(0, Math.min(15, note.track)),
+      channel: midiChannelForNote(note),
       note: Math.max(0, Math.min(127, note.pitch)),
       velocity: Math.max(1, Math.min(127, note.velocity)),
     })

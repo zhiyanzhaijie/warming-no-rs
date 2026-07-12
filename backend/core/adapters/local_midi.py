@@ -3,7 +3,7 @@ import threading
 from pathlib import Path
 
 from core.app.music.local_library_model import DiscoveredMidiFile
-from core.domain.music import NoteEvent, PianoScore, ScorePart
+from core.domain.music import NoteEvent, PianoScore, ScorePart, assign_hands
 from core.adapters.persistence.json_music_repository import JsonMusicPieceRepository
 
 
@@ -139,7 +139,10 @@ def parse_midi_score(bytes_: bytes) -> PianoScore:
         notes.extend(parsed["notes"])
         parts.append(
             ScorePart(
-                name=f"Track {track_index + 1}",
+                track=track_index,
+                name=parsed["name"] or f"Track {track_index + 1}",
+                instrument_name=parsed["instrument_name"],
+                channels=tuple(sorted(parsed["channels"])),
                 note_count=len(parsed["notes"]),
             )
         )
@@ -149,17 +152,19 @@ def parse_midi_score(bytes_: bytes) -> PianoScore:
         for part in parts
         if part.note_count > 0
     ] or [
-        ScorePart(name=f"Track {index + 1}", note_count=0)
+        ScorePart(track=index, name=f"Track {index + 1}", note_count=0)
         for index in range(track_count)
-    ] or [ScorePart(name="Track 1", note_count=0)]
+    ] or [ScorePart(track=0, name="Track 1", note_count=0)]
     if not notes:
         raise ValueError("MIDI contains no note events")
     notes.sort(key=lambda note: (note.start_beats, note.pitch, note.track))
-    return PianoScore(
-        parts=parts,
-        notes=notes,
-        tempos=tempos or [120.0],
-        meters=meters or ["4/4"],
+    return assign_hands(
+        PianoScore(
+            parts=parts,
+            notes=notes,
+            tempos=tempos or [120.0],
+            meters=meters or ["4/4"],
+        )
     )
 
 
@@ -167,10 +172,14 @@ def parse_track(track: bytes, ticks_per_beat: int, track_index: int) -> dict[str
     offset = 0
     absolute_ticks = 0
     running_status: int | None = None
-    active: dict[tuple[int, int], list[tuple[int, int]]] = {}
+    active: dict[tuple[int, int], list[tuple[int, int, int]]] = {}
     notes: list[NoteEvent] = []
     tempos: list[float] = []
     meters: list[str] = []
+    name: str | None = None
+    instrument_name: str | None = None
+    channels: set[int] = set()
+    note_sequence = 0
 
     while offset < len(track):
         delta, offset = read_vlq(track, offset)
@@ -203,6 +212,10 @@ def parse_track(track: bytes, ticks_per_beat: int, track_index: int) -> dict[str
             elif meta_type == 0x58 and len(payload) >= 2:
                 denominator = 2 ** payload[1]
                 meters.append(f"{payload[0]}/{denominator}")
+            elif meta_type == 0x03:
+                name = decode_midi_text(payload)
+            elif meta_type == 0x04:
+                instrument_name = decode_midi_text(payload)
             continue
 
         if status in (0xF0, 0xF7):
@@ -212,6 +225,7 @@ def parse_track(track: bytes, ticks_per_beat: int, track_index: int) -> dict[str
 
         event_type = status & 0xF0
         channel = status & 0x0F
+        channels.add(channel)
         data_len = 1 if event_type in (0xC0, 0xD0) else 2
         data = track[offset : offset + data_len]
         offset += data_len
@@ -219,27 +233,48 @@ def parse_track(track: bytes, ticks_per_beat: int, track_index: int) -> dict[str
             break
 
         if event_type == 0x90 and data[1] > 0:
-            active.setdefault((channel, data[0]), []).append((absolute_ticks, data[1]))
+            active.setdefault((channel, data[0]), []).append(
+                (absolute_ticks, data[1], note_sequence)
+            )
+            note_sequence += 1
         elif event_type == 0x80 or event_type == 0x90:
             key = (channel, data[0])
             starts = active.get(key)
             if not starts:
                 continue
-            start_ticks, velocity = starts.pop()
+            start_ticks, velocity, sequence = starts.pop()
             duration_ticks = absolute_ticks - start_ticks
             if duration_ticks <= 0:
                 continue
             notes.append(
                 NoteEvent(
+                    id=f"t{track_index}-c{channel}-n{sequence}",
                     pitch=data[0],
                     start_beats=start_ticks / ticks_per_beat,
                     duration_beats=duration_ticks / ticks_per_beat,
                     velocity=velocity,
                     track=track_index,
+                    channel=channel,
                 )
             )
 
-    return {"notes": notes, "tempos": tempos, "meters": meters}
+    return {
+        "notes": notes,
+        "tempos": tempos,
+        "meters": meters,
+        "name": name,
+        "instrument_name": instrument_name,
+        "channels": channels,
+    }
+
+
+def decode_midi_text(payload: bytes) -> str:
+    for encoding in ("utf-8", "gb18030", "latin-1"):
+        try:
+            return payload.decode(encoding).strip("\x00 ")
+        except UnicodeDecodeError:
+            continue
+    return ""
 
 
 def read_vlq(data: bytes, offset: int) -> tuple[int, int]:

@@ -106,14 +106,21 @@ def piece_score_response(piece: MusicPiece) -> dict[str, Any]:
         "tempoBpm": tempo,
         "timeSignature": time_signature,
         "totalBeats": total_beats,
+        "handAnalysisVersion": score.hand_analysis_version if score else None,
+        "handConfidence": (
+            sum(note.hand_confidence for note in notes) / len(notes) if notes else 0
+        ),
         "notes": [
             {
-                "id": f"{index}-{note.pitch}-{note.start_beats:.4f}",
+                "id": note.id or f"{index}-{note.pitch}-{note.start_beats:.4f}",
                 "pitch": note.pitch,
                 "startBeat": note.start_beats,
                 "durationBeats": note.duration_beats,
                 "velocity": note.velocity or 64,
                 "track": note.track,
+                "channel": note.channel,
+                "hand": note.hand,
+                "handConfidence": note.hand_confidence,
             }
             for index, note in enumerate(notes)
         ],

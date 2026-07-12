@@ -26,7 +26,7 @@ export const usePracticeStore = create<PracticeState>((set) => ({
   isPlaying: false,
   loopEnabled: true,
   loopRange: [8, 12],
-  mode: 'both-hands',
+  mode: 'listen',
   connectedDevice: 'Local MIDI Device',
   setBpm: (bpm) => set({ bpm }),
   setCurrentBeat: (currentBeat) => set({ currentBeat }),
@@ -34,8 +34,11 @@ export const usePracticeStore = create<PracticeState>((set) => ({
     set((state) => ({
       seekRequest: { pieceId, beat, id: (state.seekRequest?.id ?? 0) + 1 },
     })),
-  setMode: (mode) => set({ mode }),
-  togglePlayback: () => set((state) => ({ isPlaying: !state.isPlaying })),
+  setMode: (mode) => set({ mode, isPlaying: false }),
+  togglePlayback: () =>
+    set((state) =>
+      state.mode !== 'free' ? { isPlaying: !state.isPlaying } : state,
+    ),
   toggleLoop: () => set((state) => ({ loopEnabled: !state.loopEnabled })),
   setLoopRange: (loopRange) => set({ loopRange }),
 }))
