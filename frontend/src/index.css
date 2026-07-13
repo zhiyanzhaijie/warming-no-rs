@@ -219,3 +219,50 @@
     transform: translateX(410%);
   }
 }
+
+@keyframes practice-wind {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px) scaleX(0.45);
+  }
+  35% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(12px) scaleX(1);
+  }
+}
+
+@layer utilities {
+  .practice-wind {
+    position: absolute;
+    left: 1px;
+    height: 1px;
+    width: 30px;
+    transform-origin: center;
+    background: linear-gradient(90deg, transparent, var(--primary), transparent);
+    animation: practice-wind 1.7s ease-in-out infinite;
+  }
+
+  .practice-wind-one {
+    top: 9px;
+  }
+
+  .practice-wind-two {
+    top: 17px;
+    animation-delay: 0.38s;
+  }
+
+  .practice-wind-three {
+    top: 25px;
+    animation-delay: 0.76s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .practice-wind {
+      animation: none;
+      opacity: 0.35;
+    }
+  }
+}

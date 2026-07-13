@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Bot } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { scoreApi } from '../api/score'
 import {
   Sheet,
@@ -20,19 +20,15 @@ import { usePracticeShortcuts } from '../features/practice/usePracticeShortcuts'
 import type { PracticeMode, ScoreNote } from '../shared/types/domain'
 
 export function PracticePage() {
-  const [params] = useSearchParams()
-  const requestedPieceId = params.get('pieceId')
+  const sessionPieceId = usePracticeStore((state) => state.session?.pieceId)
   const setBpm = usePracticeStore((state) => state.setBpm)
   const mode = usePracticeStore((state) => state.mode)
   const setMode = usePracticeStore((state) => state.setMode)
+  const pausePlayback = usePracticeStore((state) => state.pausePlayback)
   const [consoleExpanded, setConsoleExpanded] = useState(true)
   const [agentPanelOpen, setAgentPanelOpen] = useState(false)
 
-  const { data: pieces = [] } = useQuery({
-    queryKey: ['pieces'],
-    queryFn: scoreApi.listPieces,
-  })
-  const pieceId = requestedPieceId ?? pieces[0]?.id
+  const pieceId = sessionPieceId
   const { data: score, refetch: refetchScore } = useQuery({
     queryKey: ['piece-score', pieceId],
     queryFn: () => scoreApi.getPieceScore(pieceId ?? ''),
@@ -59,6 +55,10 @@ export function PracticePage() {
   useEffect(() => {
     if (!availableModes.has(mode)) setMode('listen')
   }, [availableModes, mode, setMode])
+
+  useEffect(() => () => pausePlayback(), [pausePlayback])
+
+  if (!sessionPieceId) return <Navigate to="/library" replace />
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background text-foreground">

@@ -1,8 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { scoreApi } from '../api/score'
+import { usePracticeStore } from '../features/practice/practiceStore'
 
 export function PieceDetailPage() {
+  const navigate = useNavigate()
+  const startSession = usePracticeStore((state) => state.startSession)
   const { pieceId = '' } = useParams()
   const { data: piece } = useQuery({
     queryKey: ['piece', pieceId],
@@ -67,12 +70,16 @@ export function PieceDetailPage() {
               <dd className="font-bold text-foreground">{piece.lastPracticedAt}</dd>
             </div>
           </dl>
-          <Link
-            to="/practice"
+          <button
+            type="button"
+            onClick={() => {
+              startSession({ id: piece.id, title: piece.title })
+              navigate('/practice')
+            }}
             className="mt-5 inline-flex rounded-full bg-spotify-green px-5 py-2.5 text-sm font-bold uppercase tracking-[1.4px] text-primary-foreground hover:bg-spotify-green-hover"
           >
             开始练习
-          </Link>
+          </button>
         </div>
       </section>
     </div>

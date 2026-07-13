@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { PracticeMode } from '../../shared/types/domain'
 
 type PracticeState = {
+  session: PracticeSession | null
   bpm: number
   currentBeat: number
   seekRequest: { pieceId: string; beat: number; id: number } | null
@@ -11,7 +12,7 @@ type PracticeState = {
   loopSelecting: boolean
   loopSelectionAnchor: LoopMeasure | null
   mode: PracticeMode
-  connectedDevice: string
+  startSession: (piece: { id: string; title: string }) => void
   setBpm: (bpm: number) => void
   setCurrentBeat: (currentBeat: number) => void
   requestSeek: (pieceId: string, beat: number) => void
@@ -22,6 +23,12 @@ type PracticeState = {
   beginLoopSelection: () => void
   selectLoopMeasure: (measure: LoopMeasure) => void
   clearLoop: () => void
+}
+
+export type PracticeSession = {
+  pieceId: string
+  pieceTitle: string
+  currentBeat: number
 }
 
 export type LoopMeasure = {
@@ -38,6 +45,7 @@ export type LoopRange = {
 }
 
 export const usePracticeStore = create<PracticeState>((set) => ({
+  session: null,
   bpm: 72,
   currentBeat: 0,
   seekRequest: null,
@@ -47,9 +55,23 @@ export const usePracticeStore = create<PracticeState>((set) => ({
   loopSelecting: false,
   loopSelectionAnchor: null,
   mode: 'listen',
-  connectedDevice: '本地 MIDI 设备',
+  startSession: (piece) =>
+    set((state) => state.session?.pieceId === piece.id
+      ? { session: { ...state.session, pieceTitle: piece.title }, isPlaying: false }
+      : {
+          session: { pieceId: piece.id, pieceTitle: piece.title, currentBeat: 0 },
+          currentBeat: 0,
+          isPlaying: false,
+          loopEnabled: false,
+          loopRange: null,
+          loopSelecting: false,
+          loopSelectionAnchor: null,
+        }),
   setBpm: (bpm) => set({ bpm }),
-  setCurrentBeat: (currentBeat) => set({ currentBeat }),
+  setCurrentBeat: (currentBeat) => set((state) => ({
+    currentBeat,
+    session: state.session ? { ...state.session, currentBeat } : null,
+  })),
   requestSeek: (pieceId, beat) =>
     set((state) => ({
       seekRequest: { pieceId, beat, id: (state.seekRequest?.id ?? 0) + 1 },

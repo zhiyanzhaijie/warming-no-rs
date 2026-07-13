@@ -76,7 +76,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
   const timelineRef = useRef<HTMLDivElement | null>(null)
   const beatLabelRef = useRef<HTMLSpanElement | null>(null)
   const pianoKeyboardRef = useRef<PianoKeyboardHandle | null>(null)
-  const currentBeatRef = useRef(0)
+  const currentBeatRef = useRef(usePracticeStore.getState().session?.currentBeat ?? 0)
   const bpmRef = useRef(bpm)
   const isPlayingRef = useRef(isPlaying)
   const pixelsPerBeatRef = useRef(pixelsPerBeat)
@@ -116,8 +116,8 @@ export function FallingNotes({ score }: FallingNotesProps) {
   )
   const autoPlayNotes = useMemo(() => selectAutoPlayNotes(notes, mode), [mode, notes])
   const pianoKeyEvents = useMemo(
-    () => buildPianoKeyEvents(autoPlayNotes, activeKeyByPitch),
-    [activeKeyByPitch, autoPlayNotes],
+    () => buildPianoKeyEvents(autoPlayNotes, rangeStart, rangeEnd),
+    [autoPlayNotes, rangeEnd, rangeStart],
   )
   const midiEvents = useMemo(() => buildMidiPlaybackEvents(autoPlayNotes), [autoPlayNotes])
   const handleUserNoteOn = useCallback((pitch: number) => {
@@ -321,8 +321,18 @@ export function FallingNotes({ score }: FallingNotesProps) {
   }, [autoPlayNotes, isPlaying, loopEnabled, loopRange, midiEvents, mode, notes, pausePlayback, pianoKeyEvents, score?.pieceId, score?.totalBeats, setCurrentBeat, startRenderTransition])
 
   useLayoutEffect(() => {
-    synchronizePosition(0, false)
-  }, [mode, score?.pieceId, setCurrentBeat])
+    if (!score?.pieceId) return
+    const session = usePracticeStore.getState().session
+    const targetBeat = session?.pieceId === score.pieceId
+      ? Math.max(0, Math.min(session.currentBeat, score.totalBeats))
+      : 0
+    synchronizePosition(targetBeat, false)
+  }, [mode, score?.pieceId, score?.totalBeats])
+
+  useEffect(() => () => {
+    setCurrentBeat(currentBeatRef.current)
+    stopInstrument()
+  }, [setCurrentBeat])
 
   useLayoutEffect(() => {
     if (!seekRequest || seekRequest.pieceId !== score?.pieceId) return
@@ -568,11 +578,12 @@ function buildMeasureGuides(totalBeats: number, timeSignature: string): MeasureG
 
 function buildPianoKeyEvents(
   notes: ScoreNote[],
-  keyByPitch: ReadonlyMap<number, PianoKeyLayout>,
+  rangeStart: number,
+  rangeEnd: number,
 ): PianoKeyEvent[] {
   const events: PianoKeyEvent[] = []
   for (const note of notes) {
-    if (!keyByPitch.has(note.pitch)) continue
+    if (note.pitch < rangeStart || note.pitch > rangeEnd) continue
     events.push({ beat: note.startBeat, pitch: note.pitch, delta: 1 })
     events.push({ beat: note.startBeat + note.durationBeats, pitch: note.pitch, delta: -1 })
   }

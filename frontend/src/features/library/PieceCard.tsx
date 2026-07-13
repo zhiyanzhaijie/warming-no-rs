@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import type { Piece } from '../../shared/types/domain'
 import { Play, Music, Clock, Activity, Trash2, X, Check, FileText } from 'lucide-react'
+import { usePracticeStore } from '../practice/practiceStore'
 
 type PieceCardProps = {
   piece: Piece
@@ -17,6 +18,13 @@ export function PieceCard({
   confirmingRemove = false,
   removing = false,
 }: PieceCardProps) {
+  const navigate = useNavigate()
+  const startSession = usePracticeStore((state) => state.startSession)
+  const beginPractice = () => {
+    startSession({ id: piece.id, title: piece.title })
+    navigate('/practice')
+  }
+
   return (
     <article className="group relative flex flex-col overflow-hidden border-b border-border/40 bg-transparent py-6 transition-all duration-500 hover:bg-foreground/[0.02]">
       <div className="flex items-start justify-between gap-4 px-2">
@@ -93,13 +101,14 @@ export function PieceCard({
           </div>
         ) : (
           <>
-            <Link
+            <button
+              type="button"
               className="flex h-8 min-w-0 flex-1 items-center justify-center gap-2 border border-border/40 bg-transparent px-3 text-[10px] font-bold uppercase tracking-widest text-foreground transition-all hover:border-foreground hover:bg-foreground hover:text-background"
-              to={`/practice?pieceId=${encodeURIComponent(piece.id)}`}
+              onClick={beginPractice}
             >
               <Play className="size-3 shrink-0 fill-current" />
               <span className="truncate">开始练习</span>
-            </Link>
+            </button>
             <Link
               className="grid size-8 shrink-0 place-items-center border border-border/20 bg-transparent text-muted-foreground transition-all hover:border-foreground/50 hover:text-foreground"
               to={`/pieces/${piece.id}`}
