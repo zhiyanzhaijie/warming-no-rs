@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { RefreshCw, Library, Info, X, FolderKanban } from 'lucide-react'
 import { scoreApi } from '../api/score'
 import { PieceCard } from '../features/library/PieceCard'
 
@@ -47,7 +48,7 @@ export function LibraryPage() {
     mutationFn: scoreApi.refreshLocalLibrary,
     onSuccess: (report) => {
       setMessage(
-        `刷新完成：发现 ${report.discoveredFiles} 个 MIDI，新增 ${report.registeredFiles} 首，更新 ${report.updatedFiles} 首`,
+        `刷新成功：新发现 ${report.discoveredFiles} 个 MIDI，已同步 ${report.registeredFiles} 首。`
       )
       void queryClient.invalidateQueries({ queryKey: ['pieces'] })
       void queryClient.invalidateQueries({ queryKey: ['piece-score'] })
@@ -75,7 +76,7 @@ export function LibraryPage() {
     },
     onSuccess: (_result, removedPiece) => {
       setConfirmingPieceId(null)
-      setMessage('已从曲库移除。源 MIDI 文件仍保留，刷新曲库可重新导入。')
+      setMessage('已从曲库中移除。')
       queryClient.removeQueries({ queryKey: ['piece-score', removedPiece.id] })
     },
     onError: (mutationError, _removedPiece, context) => {
@@ -92,90 +93,151 @@ export function LibraryPage() {
       return
     }
     setConfirmingPieceId(piece.id)
-    setMessage('确认后只移除曲库记录，不会删除源 MIDI 文件。')
+    setMessage('确定要从曲库中移除这首曲目吗？（不会删除本地 MIDI 源文件）')
   }
 
   return (
-    <div className="p-6 max-[720px]:p-4">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[1.8px] text-muted-foreground">
-            MIDI Library
-          </p>
-          <h1 className="mt-2 font-title text-2xl font-bold text-foreground">
-            本地曲库
-          </h1>
-        </div>
-        <button
-          type="button"
-          onClick={() => refresh.mutate()}
-          className="rounded-full bg-spotify-green px-5 py-2.5 text-sm font-bold uppercase tracking-[1.4px] text-primary-foreground shadow-heavy transition hover:bg-spotify-green-hover"
-        >
-          刷新曲库
-        </button>
-      </header>
+    <div className="relative flex h-full w-full overflow-hidden bg-[#030303] font-sans text-white/90">
+      {/* Background Video */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 size-full object-cover opacity-20 mix-blend-screen pointer-events-none"
+        src="/ascii-flower.mp4"
+      />
+      {/* Elegant organic ambient radial-gradient masking */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/45 to-transparent pointer-events-none" />
 
-      <section className="mt-5 rounded-lg bg-card p-4 shadow-medium">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-title text-lg font-bold text-foreground">
-              监听 MIDI 文件夹
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              选择一个或多个本地文件夹，应用会登记路径并立即扫描 .mid / .midi 文件。
+      {/* Main Structural Division */}
+      <div className="relative z-10 flex size-full justify-between pl-14 pr-14 xl:pl-20 xl:pr-20">
+        
+        {/* Left Editorial Column: Left Aligned and Integrated */}
+        <main className="flex h-full w-[40%] min-w-[360px] max-w-[480px] shrink-0 flex-col justify-between py-16 pr-8">
+          
+          {/* Top Title Group */}
+          <div className="flex flex-col">
+            <div className="mb-4 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.4em] text-white/20">
+              <span className="block h-[1px] w-6 bg-white/10"></span>
+              <span>Warming Piano</span>
+            </div>
+            <h1 className="font-title text-5xl font-extrabold tracking-tighter text-white sm:text-6xl">
+              钢琴曲库
+            </h1>
+            <p className="mt-5 text-sm font-medium leading-relaxed text-white/40 max-w-sm">
+              专为落键钢琴练习打造的个人曲库。<br />
+              导入本地 MIDI 目录，自动解析生成极简下落音符谱面。
             </p>
           </div>
-          <button
-            type="button"
-            disabled={selectDirectories.isPending || addWatchPaths.isPending}
-            onClick={() => selectDirectories.mutate()}
-            className="rounded-full bg-secondary px-5 py-3 text-sm font-bold uppercase tracking-[1.4px] text-foreground transition hover:bg-dark-card disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            选择文件夹
-          </button>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {(watchPaths?.paths ?? []).map((item) => (
-            <span
-              key={item}
-              className="max-w-full truncate rounded-full bg-secondary px-3 py-1.5 text-xs font-bold text-muted-foreground"
-              title={item}
-            >
-              {item}
-            </span>
-          ))}
-        </div>
-        {message ? (
-          <p className="mt-3 text-sm font-bold text-near-white">{message}</p>
-        ) : null}
-        {isError ? (
-          <p className="mt-3 text-sm font-bold text-destructive">
-            {error instanceof Error ? error.message : '无法连接本地后端'}
-          </p>
-        ) : null}
-      </section>
 
-      <section className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-4">
-        {pieces.length > 0 ? (
-          pieces.map((piece) => (
-            <PieceCard
-              key={piece.id}
-              piece={piece}
-              onRemove={requestRemove}
-              onCancelRemove={() => setConfirmingPieceId(null)}
-              confirmingRemove={confirmingPieceId === piece.id}
-              removing={
-                removePiece.isPending &&
-                removePiece.variables?.sourcePath === piece.sourcePath
-              }
-            />
-          ))
-        ) : (
-          <div className="rounded-lg bg-card p-5 text-sm text-muted-foreground shadow-medium">
-            还没有 MIDI 曲目。选择一个包含 .mid 或 .midi 文件的本地文件夹。
+          {/* Center Integration Group: Directories, Status, and Controls in ONE solid block */}
+          <div className="flex flex-col gap-6 border border-white/10 bg-transparent p-6 w-full">
+            {/* Folder Connection Action */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col">
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">MIDI 文件夹</h3>
+                <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-white/40">关联本地文件夹，扫描并同步曲目</p>
+              </div>
+              <button
+                type="button"
+                disabled={selectDirectories.isPending || addWatchPaths.isPending}
+                onClick={() => selectDirectories.mutate()}
+                className="flex h-8 items-center justify-center border border-white/20 bg-transparent px-4 text-[10px] font-bold uppercase tracking-widest text-white transition hover:border-white hover:bg-white hover:text-black active:scale-95"
+              >
+                <span>连接</span>
+              </button>
+            </div>
+
+            {/* Listening tags - directly grouped with directories */}
+            {!!watchPaths?.paths?.length && (
+              <div className="flex flex-col gap-2.5 border-t border-white/10 pt-4">
+                <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/30">Listening Directories</span>
+                <div className="flex flex-col gap-1.5">
+                  {watchPaths.paths.map((p) => (
+                    <span key={p} className="truncate text-[11px] font-medium tracking-wide text-white/50 hover:text-white" title={p}>
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Messages/Errors - closely coupled to the operations in this card */}
+            {(message || isError) && (
+              <div className="flex items-start gap-2.5 border-t border-white/10 pt-4 text-[11px] leading-relaxed">
+                <Info className="mt-0.5 size-3.5 shrink-0 text-white/40" />
+                <p className="flex-1 text-white/50">{message || (error instanceof Error ? error.message : '同步故障')}</p>
+                {message && (
+                  <button type="button" onClick={() => setMessage(null)} className="opacity-40 hover:opacity-100">
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-        )}
-      </section>
+
+          {/* Bottom Metabar & Sympathetic Action */}
+          <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-white/30">
+            <button
+              type="button"
+              onClick={() => refresh.mutate()}
+              className="flex items-center gap-2 text-white/40 transition hover:text-white"
+            >
+              <RefreshCw className={`size-3.5 ${refresh.isPending ? 'animate-spin' : ''}`} />
+              <span>刷新曲库</span>
+            </button>
+            <span>•</span>
+            <span>{pieces.length} Tracks</span>
+          </div>
+
+        </main>
+
+        {/* Right Pieces Column: Single Column, pushed completely to the right edge */}
+        <aside className="flex h-full w-[360px] shrink-0 flex-col py-16 xl:w-[400px]">
+          <header className="flex shrink-0 items-center justify-between pb-6 border-b border-white/5">
+            <h2 className="font-title text-sm font-bold tracking-[0.2em] text-white/40">
+              REPERTOIRE
+            </h2>
+            <span className="rounded-full bg-white/5 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-white/40">
+              {pieces.length} Pieces
+            </span>
+          </header>
+          
+          <div className="flex-1 overflow-y-auto no-scrollbar pt-6">
+            {pieces.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                {pieces.map((piece) => (
+                  <PieceCard
+                    key={piece.id}
+                    piece={piece}
+                    onRemove={requestRemove}
+                    onCancelRemove={() => setConfirmingPieceId(null)}
+                    confirmingRemove={confirmingPieceId === piece.id}
+                    removing={
+                      removePiece.isPending &&
+                      removePiece.variables?.sourcePath === piece.sourcePath
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex h-full min-h-[300px] flex-col items-center justify-center text-center opacity-60">
+                <div className="mb-6 p-4 rounded-full border border-white/5 bg-white/5">
+                  <Library className="size-6 text-white/20" />
+                </div>
+                <h3 className="font-title text-base tracking-[0.2em] text-white/50">
+                  曲库空白
+                </h3>
+                <p className="mt-3 max-w-[200px] text-[10px] leading-relaxed tracking-widest text-white/30">
+                  从左侧琴房控制台<br />建立本地文件夹连接
+                </p>
+              </div>
+            )}
+          </div>
+        </aside>
+
+      </div>
     </div>
   )
 }
