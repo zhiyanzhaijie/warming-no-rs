@@ -22,7 +22,7 @@ export function PieceCard({
   const startSession = usePracticeStore((state) => state.startSession)
   const beginPractice = () => {
     startSession({ id: piece.id, title: piece.title })
-    navigate('/practice')
+    navigate('/practice', { viewTransition: true })
   }
 
   return (
@@ -112,6 +112,7 @@ export function PieceCard({
             <Link
               className="grid size-8 shrink-0 place-items-center border border-border/20 bg-transparent text-muted-foreground transition-all hover:border-foreground/50 hover:text-foreground"
               to={`/pieces/${piece.id}`}
+              viewTransition
               title="查看谱面"
             >
               <FileText className="size-3.5" />

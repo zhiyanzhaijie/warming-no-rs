@@ -18,7 +18,7 @@ export function PieceDetailPage() {
 
   return (
     <div className="p-6 max-[720px]:p-4">
-      <Link className="text-sm font-bold text-muted-foreground hover:text-foreground" to="/library">
+      <Link className="text-sm font-bold text-muted-foreground hover:text-foreground" to="/library" viewTransition>
         返回曲库
       </Link>
       <header className="mt-5 rounded-lg bg-card p-5 shadow-medium">
@@ -74,7 +74,7 @@ export function PieceDetailPage() {
             type="button"
             onClick={() => {
               startSession({ id: piece.id, title: piece.title })
-              navigate('/practice')
+              navigate('/practice', { viewTransition: true })
             }}
             className="mt-5 inline-flex rounded-full bg-spotify-green px-5 py-2.5 text-sm font-bold uppercase tracking-[1.4px] text-primary-foreground hover:bg-spotify-green-hover"
           >

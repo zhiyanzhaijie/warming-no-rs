@@ -55,7 +55,7 @@ export function PracticePage() {
       console.error('Unable to stop audio output', error)
     })
     endSession()
-    navigate('/library', { replace: true })
+    navigate('/library', { replace: true, viewTransition: true })
   }, [endSession, navigate])
   usePracticeShortcuts(
     availableModes,

@@ -106,7 +106,7 @@ export function AppShell() {
                           tooltip={item.label}
                           className="relative h-9 rounded-none border-0 bg-transparent px-3 text-[11px] font-bold tracking-[0.12em] text-muted-foreground shadow-none before:absolute before:inset-y-2 before:left-0 before:w-px before:bg-transparent before:transition-colors data-[active=true]:bg-transparent data-[active=true]:text-sidebar-foreground data-[active=true]:before:bg-primary hover:bg-sidebar-accent/25 hover:text-sidebar-foreground group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
                         >
-                          <NavLink to={item.to}>
+                          <NavLink to={item.to} viewTransition>
                             <Icon className="size-4" />
                             <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                           </NavLink>
@@ -123,6 +123,7 @@ export function AppShell() {
             {sessionPieceId && sessionPieceTitle ? (
               <NavLink
                 to="/practice"
+                viewTransition
                 aria-label={`返回练习：${sessionPieceTitle}`}
                 className="group/session flex min-w-0 items-center gap-3 border border-sidebar-border bg-transparent p-3 transition hover:border-sidebar-foreground/30 hover:bg-sidebar-accent/40 group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:p-0"
               >
@@ -151,8 +152,10 @@ export function AppShell() {
         </Sidebar>
 
         <SidebarInset className="min-w-0 overflow-hidden bg-background p-2">
-          <main className="h-full min-h-0 min-w-0 overflow-hidden rounded-lg bg-background">
-            <Outlet />
+          <main className="route-content h-full min-h-0 min-w-0 overflow-hidden rounded-lg bg-background">
+            <div key={location.key} className="route-fallback-enter h-full min-h-0">
+              <Outlet />
+            </div>
           </main>
         </SidebarInset>
       </div>
