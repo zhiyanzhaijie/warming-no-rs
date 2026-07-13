@@ -1,6 +1,7 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Check,
+  CircleStop,
   FileAudio,
   FileMusic,
   FolderOutput,
@@ -10,7 +11,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { transcriptionApi, type SelectedAudioFile } from '../api/transcription'
+import { transcriptionApi, type SelectedAudioFile, type TranscriptionTask } from '../api/transcription'
 import { cn } from '@/lib/utils'
 
 const workflow = [
@@ -31,6 +32,7 @@ function formatDuration(seconds: number) {
 }
 
 export function ProcessingPage() {
+  const queryClient = useQueryClient()
   const [file, setFile] = useState<SelectedAudioFile | null>(null)
   const [outputPath, setOutputPath] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState(0)
@@ -40,6 +42,11 @@ export function ProcessingPage() {
     queryKey: ['transkun-status'],
     queryFn: transcriptionApi.checkTranskun,
     retry: false,
+  })
+  const task = useQuery({
+    queryKey: ['transcription-task'],
+    queryFn: transcriptionApi.getTask,
+    refetchInterval: (query) => ['running', 'cancelling'].includes(query.state.data?.status ?? '') ? 750 : false,
   })
   const selectFile = useMutation({
     mutationFn: transcriptionApi.selectAudio,
@@ -58,24 +65,72 @@ export function ProcessingPage() {
       setMessage(null)
       setOutputPath(null)
     },
-    onSuccess: (result) => {
-      if (!result) {
+    onSuccess: (startedTask) => {
+      if (!startedTask) {
         setMessage('已取消保存，未开始转换。')
         return
       }
-      setOutputPath(result.outputPath)
+      task.refetch().catch(() => undefined)
     },
     onError: (error) => setMessage(error instanceof Error ? error.message : 'MIDI 生成失败'),
   })
+  const cancelTask = useMutation({
+    mutationFn: transcriptionApi.cancelTask,
+    onSuccess: (snapshot) => {
+      queryClient.setQueryData(['transcription-task'], snapshot)
+      setMessage(null)
+    },
+    onError: (error) => setMessage(error instanceof Error ? error.message : '无法取消转换'),
+  })
+  const resetTask = useMutation({
+    mutationFn: transcriptionApi.resetTask,
+    onSuccess: (snapshot) => {
+      queryClient.setQueryData(['transcription-task'], snapshot)
+      setFile(null)
+      setOutputPath(null)
+      setElapsed(0)
+      setMessage(null)
+    },
+    onError: (error) => setMessage(error instanceof Error ? error.message : '无法重置任务'),
+  })
 
   useEffect(() => {
-    if (!generate.isPending) return
+    if (!['running', 'cancelling'].includes(task.data?.status ?? '')) return
     const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000)
     return () => window.clearInterval(timer)
-  }, [generate.isPending])
+  }, [task.data?.status])
+
+  useEffect(() => {
+    const snapshot = task.data
+    if (!snapshot) return
+    if (snapshot.status === 'idle') {
+      setFile(null)
+      setOutputPath(null)
+      setElapsed(0)
+      setMessage(null)
+      return
+    }
+    if (snapshot.inputPath && snapshot.inputName) {
+      setFile({
+        path: snapshot.inputPath,
+        name: snapshot.inputName,
+        sizeBytes: snapshot.inputSizeBytes ?? 0,
+      })
+    }
+    setOutputPath(snapshot.status === 'succeeded' ? snapshot.outputPath : null)
+    if (snapshot.status === 'failed') setMessage(snapshot.error ?? 'MIDI 生成失败')
+    if (snapshot.startedAtMs) {
+      const finishedAt = snapshot.finishedAtMs ?? Date.now()
+      setElapsed(Math.max(0, Math.floor((finishedAt - snapshot.startedAtMs) / 1000)))
+    }
+  }, [task.data])
 
   const ready = transkun.data?.available === true
-  const currentStep = outputPath ? 4 : generate.isPending ? 3 : file ? 2 : ready ? 1 : 0
+  const isRunning = ['running', 'cancelling'].includes(task.data?.status ?? '') || generate.isPending
+  const isCancelling = task.data?.status === 'cancelling' || cancelTask.isPending
+  const isFinished = task.data?.status === 'succeeded' || task.data?.status === 'failed'
+  const currentStep = outputPath ? 4 : isRunning ? 3 : file ? 2 : ready ? 1 : 0
+  const progress = progressFromLogs(task.data?.logs ?? [])
   const statusDetail = transkun.data?.detail
     ?? (transkun.error instanceof Error ? transkun.error.message : '正在确认本地 Python 环境。')
 
@@ -97,7 +152,7 @@ export function ProcessingPage() {
         <button
           type="button"
           onClick={() => void transkun.refetch()}
-          disabled={transkun.isFetching || generate.isPending}
+          disabled={transkun.isFetching || isRunning}
           className="grid size-9 shrink-0 place-items-center border border-white/10 text-white/40 transition hover:border-white/35 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="重新检测转换引擎"
           title="重新检测转换引擎"
@@ -150,7 +205,7 @@ export function ProcessingPage() {
 
           <button
             type="button"
-            disabled={!ready || selectFile.isPending || generate.isPending}
+            disabled={!ready || selectFile.isPending || isRunning}
             onClick={() => selectFile.mutate()}
             className="group relative flex min-h-64 flex-1 items-center justify-center overflow-hidden border-b border-white/10 px-8 py-10 text-left transition hover:bg-white/[0.025] disabled:cursor-not-allowed disabled:opacity-40 max-[720px]:px-5"
           >
@@ -188,6 +243,10 @@ export function ProcessingPage() {
             </div>
           </button>
 
+          {task.data && task.data.status !== 'idle' && task.data.inputPath === file?.path ? (
+            <TaskOutput task={task.data} elapsed={elapsed} progress={progress} />
+          ) : null}
+
           <section className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-5 px-8 py-5 max-[720px]:grid-cols-1 max-[720px]:px-5">
             <div className="min-w-0">
               {outputPath ? (
@@ -209,14 +268,35 @@ export function ProcessingPage() {
                 </div>
               )}
             </div>
-            <button
-              type="button"
-              disabled={!ready || !file || generate.isPending}
-              onClick={() => file && generate.mutate(file.path)}
-              className="h-10 min-w-56 border border-primary bg-primary px-5 text-[10px] font-bold tracking-[0.18em] text-black transition hover:bg-transparent hover:text-primary disabled:border-white/10 disabled:bg-transparent disabled:text-white/20 max-[720px]:w-full"
-            >
-              {generate.isPending ? `正在生成 · ${formatDuration(elapsed)}` : '选择保存位置并生成 MIDI'}
-            </button>
+            {isRunning ? (
+              <button
+                type="button"
+                disabled={isCancelling}
+                onClick={() => cancelTask.mutate()}
+                className="flex h-10 min-w-56 items-center justify-center gap-2 border border-destructive/70 px-5 text-[10px] font-bold tracking-[0.18em] text-destructive transition hover:bg-destructive hover:text-black disabled:cursor-wait disabled:opacity-40 max-[720px]:w-full"
+              >
+                {isCancelling ? <LoaderCircle className="size-3.5 animate-spin" /> : <CircleStop className="size-3.5" />}
+                {isCancelling ? '正在取消转换' : `取消转换 · ${formatDuration(elapsed)}`}
+              </button>
+            ) : isFinished ? (
+              <button
+                type="button"
+                disabled={resetTask.isPending}
+                onClick={() => resetTask.mutate()}
+                className="h-10 min-w-56 border border-primary bg-primary px-5 text-[10px] font-bold tracking-[0.18em] text-black transition hover:bg-transparent hover:text-primary disabled:opacity-40 max-[720px]:w-full"
+              >
+                {resetTask.isPending ? '正在恢复' : '完成'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!ready || !file || generate.isPending}
+                onClick={() => file && generate.mutate(file.path)}
+                className="h-10 min-w-56 border border-primary bg-primary px-5 text-[10px] font-bold tracking-[0.18em] text-black transition hover:bg-transparent hover:text-primary disabled:border-white/10 disabled:bg-transparent disabled:text-white/20 max-[720px]:w-full"
+              >
+                选择保存位置并生成 MIDI
+              </button>
+            )}
           </section>
         </main>
 
@@ -262,4 +342,55 @@ export function ProcessingPage() {
       </div>
     </div>
   )
+}
+
+function TaskOutput({
+  task,
+  elapsed,
+  progress,
+}: {
+  task: TranscriptionTask
+  elapsed: number
+  progress: number | null
+}) {
+  const running = task.status === 'running' || task.status === 'cancelling'
+  const latestLogs = task.logs.slice(-8)
+
+  return (
+    <section className="shrink-0 border-b border-white/10 px-8 py-4 max-[720px]:px-5">
+      <div className="flex items-center justify-between gap-4 text-[9px] font-bold tracking-[0.2em]">
+        <span className={cn(
+          running ? 'text-primary' : task.status === 'failed' ? 'text-destructive' : 'text-white/55',
+        )}>
+          {task.status === 'cancelling' ? '正在停止 TRANSKUN' : running ? 'TRANSKUN 运行中' : task.status === 'succeeded' ? '转写完成' : '转写中断'}
+        </span>
+        <span className="text-white/25">
+          {progress === null ? formatDuration(elapsed) : `${progress}% · ${formatDuration(elapsed)}`}
+        </span>
+      </div>
+      <div className="relative mt-3 h-[3px] overflow-hidden bg-white/[0.06]">
+        {progress === null && running ? (
+          <span className="absolute inset-y-0 w-1/3 animate-[workshop-progress_1.4s_ease-in-out_infinite] bg-primary" />
+        ) : (
+          <span
+            className={cn('block h-full transition-[width] duration-500', task.status === 'failed' ? 'bg-destructive' : 'bg-primary')}
+            style={{ width: `${task.status === 'succeeded' ? 100 : progress ?? 100}%` }}
+          />
+        )}
+      </div>
+      <div className="mt-3 max-h-24 overflow-y-auto border-l border-white/10 pl-3 font-mono text-[10px] leading-5 text-white/30">
+        {latestLogs.length > 0
+          ? latestLogs.map((line, index) => <p key={`${index}-${line}`}>{line}</p>)
+          : <p>等待 TransKun 输出...</p>}
+      </div>
+    </section>
+  )
+}
+
+function progressFromLogs(logs: string[]) {
+  for (let index = logs.length - 1; index >= 0; index -= 1) {
+    const match = logs[index].match(/(?:^|\s)(100|\d{1,2})(?:\.\d+)?%/)
+    if (match) return Number(match[1])
+  }
+  return null
 }

@@ -148,3 +148,15 @@
     scrollbar-width: none;
   }
 }
+
+@keyframes workshop-progress {
+  0% {
+    transform: translateX(-110%);
+  }
+  50% {
+    transform: translateX(210%);
+  }
+  100% {
+    transform: translateX(410%);
+  }
+}

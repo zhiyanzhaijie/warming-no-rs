@@ -18,6 +18,7 @@ pub fn run() {
                 });
             app.manage(audio_output::AudioOutput::start(soundfont));
             app.manage(midi_input::MidiInputState::default());
+            app.manage(transcription::TranscriptionState::default());
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -39,7 +40,10 @@ pub fn run() {
             python_sidecar::select_midi_watch_directories,
             transcription::check_transkun,
             transcription::select_audio_file,
+            transcription::get_transcription_task,
             transcription::generate_midi,
+            transcription::cancel_transcription_task,
+            transcription::reset_transcription_task,
             audio_output::audio_output_status,
             audio_output::audio_send_events,
             audio_output::audio_send_input_events,

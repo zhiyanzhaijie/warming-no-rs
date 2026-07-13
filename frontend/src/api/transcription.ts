@@ -12,8 +12,16 @@ export type SelectedAudioFile = {
   sizeBytes: number
 }
 
-type MidiGenerationResult = {
-  outputPath: string
+export type TranscriptionTask = {
+  status: 'idle' | 'running' | 'cancelling' | 'succeeded' | 'failed'
+  inputPath: string | null
+  inputName: string | null
+  inputSizeBytes: number | null
+  outputPath: string | null
+  startedAtMs: number | null
+  finishedAtMs: number | null
+  logs: string[]
+  error: string | null
 }
 
 async function invokeDesktop<T>(command: string, args?: Record<string, unknown>) {
@@ -27,6 +35,9 @@ async function invokeDesktop<T>(command: string, args?: Record<string, unknown>)
 export const transcriptionApi = {
   checkTranskun: () => invokeDesktop<TranskunStatus>('check_transkun'),
   selectAudio: () => invokeDesktop<SelectedAudioFile | null>('select_audio_file'),
+  getTask: () => invokeDesktop<TranscriptionTask>('get_transcription_task'),
   generateMidi: (inputPath: string) =>
-    invokeDesktop<MidiGenerationResult | null>('generate_midi', { inputPath }),
+    invokeDesktop<TranscriptionTask | null>('generate_midi', { inputPath }),
+  cancelTask: () => invokeDesktop<TranscriptionTask>('cancel_transcription_task'),
+  resetTask: () => invokeDesktop<TranscriptionTask>('reset_transcription_task'),
 }
