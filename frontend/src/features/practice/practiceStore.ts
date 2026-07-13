@@ -13,6 +13,7 @@ type PracticeState = {
   loopSelectionAnchor: LoopMeasure | null
   mode: PracticeMode
   startSession: (piece: { id: string; title: string }) => void
+  endSession: () => void
   setBpm: (bpm: number) => void
   setCurrentBeat: (currentBeat: number) => void
   requestSeek: (pieceId: string, beat: number) => void
@@ -67,6 +68,16 @@ export const usePracticeStore = create<PracticeState>((set) => ({
           loopSelecting: false,
           loopSelectionAnchor: null,
         }),
+  endSession: () => set({
+    session: null,
+    currentBeat: 0,
+    seekRequest: null,
+    isPlaying: false,
+    loopEnabled: false,
+    loopRange: null,
+    loopSelecting: false,
+    loopSelectionAnchor: null,
+  }),
   setBpm: (bpm) => set({ bpm }),
   setCurrentBeat: (currentBeat) => set((state) => ({
     currentBeat,

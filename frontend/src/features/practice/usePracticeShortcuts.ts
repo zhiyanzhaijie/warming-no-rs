@@ -13,9 +13,27 @@ const modeCycle: readonly PracticeMode[] = [
 export function usePracticeShortcuts(
   availableModes: ReadonlySet<PracticeMode>,
   toggleAgentPanel: () => void,
+  exitPractice: () => void,
+  agentPanelOpen: boolean,
 ) {
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
-    if (event.repeat || isInteractiveTarget(event.target)) return
+    if (event.repeat) return
+
+    if (
+      event.key === 'Escape' &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      !agentPanelOpen &&
+      !isEditableTarget(event.target)
+    ) {
+      event.preventDefault()
+      exitPractice()
+      return
+    }
+
+    if (isInteractiveTarget(event.target)) return
 
     if (
       event.code === 'Space' &&
@@ -57,6 +75,12 @@ export function usePracticeShortcuts(
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  return target instanceof Element && Boolean(target.closest(
+    'input, textarea, select, [contenteditable="true"]',
+  ))
 }
 
 function cycleMode(availableModes: ReadonlySet<PracticeMode>, direction: 1 | -1) {

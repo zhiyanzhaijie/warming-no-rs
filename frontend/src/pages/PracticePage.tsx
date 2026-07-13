@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { Bot } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { ArrowLeft, Bot } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { instrumentOutput } from '../api/instrument'
 import { scoreApi } from '../api/score'
 import {
   Sheet,
@@ -20,11 +21,13 @@ import { usePracticeShortcuts } from '../features/practice/usePracticeShortcuts'
 import type { PracticeMode, ScoreNote } from '../shared/types/domain'
 
 export function PracticePage() {
+  const navigate = useNavigate()
   const sessionPieceId = usePracticeStore((state) => state.session?.pieceId)
   const setBpm = usePracticeStore((state) => state.setBpm)
   const mode = usePracticeStore((state) => state.mode)
   const setMode = usePracticeStore((state) => state.setMode)
   const pausePlayback = usePracticeStore((state) => state.pausePlayback)
+  const endSession = usePracticeStore((state) => state.endSession)
   const [consoleExpanded, setConsoleExpanded] = useState(true)
   const [agentPanelOpen, setAgentPanelOpen] = useState(false)
 
@@ -47,9 +50,18 @@ export function PracticePage() {
     () => buildAvailableModes(score?.notes ?? []),
     [score?.notes],
   )
+  const exitPractice = useCallback(() => {
+    void instrumentOutput.stopAll().catch((error: unknown) => {
+      console.error('Unable to stop audio output', error)
+    })
+    endSession()
+    navigate('/library', { replace: true })
+  }, [endSession, navigate])
   usePracticeShortcuts(
     availableModes,
     () => setAgentPanelOpen((open) => !open),
+    exitPractice,
+    agentPanelOpen,
   )
 
   useEffect(() => {
@@ -65,13 +77,24 @@ export function PracticePage() {
       <header className="relative z-30 shrink-0 border-b border-border bg-background/95 backdrop-blur-md">
         {consoleExpanded ? (
         <div className="relative flex min-h-16 items-center px-5 lg:px-8">
-          <div className="min-w-0 max-w-[24%]">
-            <p className="text-[9px] font-bold uppercase tracking-[0.35em] text-muted-foreground">
-              练习演奏
-            </p>
-            <h1 className="mt-1 truncate font-title text-lg font-bold tracking-tight text-foreground/90">
-              {score?.title ?? '下落音符练习'}
-            </h1>
+          <div className="flex min-w-0 max-w-[28%] items-center gap-3">
+            <button
+              type="button"
+              onClick={exitPractice}
+              className="grid size-8 shrink-0 place-items-center text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
+              aria-label="结束练习并返回曲库"
+              title="结束练习"
+            >
+              <ArrowLeft className="size-4" />
+            </button>
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-[0.35em] text-muted-foreground">
+                练习演奏
+              </p>
+              <h1 className="mt-1 truncate font-title text-lg font-bold tracking-tight text-foreground/90">
+                {score?.title ?? '下落音符练习'}
+              </h1>
+            </div>
           </div>
 
           <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-3 max-[860px]:hidden">
