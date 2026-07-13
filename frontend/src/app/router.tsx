@@ -3,7 +3,6 @@ import { AppShell } from './layout/AppShell'
 import { LibraryPage } from '../pages/LibraryPage'
 import { PieceDetailPage } from '../pages/PieceDetailPage'
 import { PracticePage } from '../pages/PracticePage'
-import { ReportsPage } from '../pages/ReportsPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { ProcessingPage } from '../pages/ProcessingPage'
 
@@ -16,7 +15,6 @@ export function AppRouter() {
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/pieces/:pieceId" element={<PieceDetailPage />} />
           <Route path="/practice" element={<PracticePage />} />
-          <Route path="/reports" element={<ReportsPage />} />
           <Route path="/processing" element={<ProcessingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

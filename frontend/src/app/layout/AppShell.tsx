@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { BookOpen, ChartNoAxesColumn, Library, Play, Settings, WandSparkles } from 'lucide-react'
+import { BookOpen, Library, Play, Settings, WandSparkles } from 'lucide-react'
 import { usePracticeStore } from '../../features/practice/practiceStore'
 import {
   Sidebar,
@@ -20,7 +20,6 @@ import {
 const navItems = [
   { to: '/library', label: '曲库', icon: Library },
   { to: '/practice', label: '练习', icon: Play },
-  { to: '/reports', label: '报告', icon: ChartNoAxesColumn },
   { to: '/processing', label: '加工', icon: WandSparkles },
   { to: '/settings', label: '设置', icon: Settings },
 ]

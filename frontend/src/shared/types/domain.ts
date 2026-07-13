@@ -46,16 +46,6 @@ export type PieceScore = {
   handConfidence: number
 }
 
-export type PracticeReport = {
-  id: string
-  pieceTitle: string
-  date: string
-  accuracy: number
-  timingScore: number
-  tempo: number
-  focus: string
-}
-
 export type AgentSuggestion = {
   id: string
   title: string

@@ -4,29 +4,7 @@ import type {
   MidiScanReport,
   Piece,
   PieceScore,
-  PracticeReport,
 } from '../shared/types/domain'
-
-const reports: PracticeReport[] = [
-  {
-    id: 'r-1',
-    pieceTitle: 'Invention No. 1',
-    date: '2026-07-07',
-    accuracy: 0.91,
-    timingScore: 0.84,
-    tempo: 72,
-    focus: '右手第 8-9 小节十六分音符均匀度',
-  },
-  {
-    id: 'r-2',
-    pieceTitle: 'Prelude Op. 28 No. 7',
-    date: '2026-07-05',
-    accuracy: 0.86,
-    timingScore: 0.8,
-    tempo: 58,
-    focus: '左手和弦提前触键',
-  },
-]
 
 const suggestions: AgentSuggestion[] = [
   {
@@ -72,10 +50,6 @@ export const apiClient = {
   },
   refreshLocalLibrary() {
     return invoke<MidiScanReport>('music_refresh_library')
-  },
-  async listReports() {
-    await wait()
-    return reports
   },
   async listAgentSuggestions() {
     await wait()
