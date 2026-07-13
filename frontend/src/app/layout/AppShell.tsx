@@ -40,7 +40,7 @@ export function AppShell() {
       }
     >
       <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
-        <Sidebar collapsible="icon" className="border-r-0 bg-near-black p-2">
+        <Sidebar collapsible="icon" className="border-r-0 bg-sidebar p-2">
           <SidebarHeader className="items-center py-2 group-data-[collapsible=icon]:px-1">
             <div className="grid size-10 place-items-center rounded-full bg-spotify-green text-primary-foreground shadow-heavy">
               <BookOpen className="size-5" />

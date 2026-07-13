@@ -55,6 +55,52 @@
 
 @layer base {
   :root {
+    --background: #fbf1c7;
+    --foreground: #282828;
+    --card: #f9f5d7;
+    --card-foreground: #282828;
+    --primary: #79740e;
+    --primary-foreground: #fbf1c7;
+    --secondary: #ebdbb2;
+    --secondary-foreground: #3c3836;
+    --muted: #ebdbb2;
+    --muted-foreground: #7c6f64;
+    --accent: #d5c4a1;
+    --accent-foreground: #282828;
+    --destructive: #9d0006;
+    --border: #d5c4a1;
+    --input: #bdae93;
+    --ring: #79740e;
+    --radius: 0.5rem;
+    --chart-3: #af3a03;
+    --chart-4: #076678;
+    --spotify-green: #79740e;
+    --spotify-green-hover: #98971a;
+    --near-black: #f2e5bc;
+    --dark-surface: #f9f5d7;
+    --mid-dark: #ebdbb2;
+    --dark-card: #d5c4a1;
+    --silver: #7c6f64;
+    --near-white: #3c3836;
+    --sidebar: #f2e5bc;
+    --sidebar-foreground: #282828;
+    --sidebar-primary: #79740e;
+    --sidebar-primary-foreground: #fbf1c7;
+    --sidebar-accent: #ebdbb2;
+    --sidebar-accent-foreground: #282828;
+    --sidebar-border: #d5c4a1;
+    --sidebar-ring: #79740e;
+
+    color: var(--foreground);
+    background: var(--background);
+    font-family: var(--font-sans);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :root.dark {
     --background: #121212;
     --foreground: #ffffff;
     --card: #181818;
@@ -71,7 +117,6 @@
     --border: #272727;
     --input: #272727;
     --ring: #1ed760;
-    --radius: 0.5rem;
     --chart-3: #ffa42b;
     --chart-4: #539df5;
     --spotify-green: #1ed760;
@@ -90,14 +135,28 @@
     --sidebar-accent-foreground: #ffffff;
     --sidebar-border: #272727;
     --sidebar-ring: #1ed760;
+  }
 
-    color: var(--foreground);
-    background: var(--background);
-    font-family: var(--font-sans);
-    font-synthesis: none;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  .immersive-dark {
+    color-scheme: dark;
+    --background: #030303;
+    --foreground: #ffffff;
+    --card: #181818;
+    --card-foreground: #ffffff;
+    --primary: #1ed760;
+    --primary-foreground: #000000;
+    --secondary: #1f1f1f;
+    --secondary-foreground: #ffffff;
+    --muted: #1f1f1f;
+    --muted-foreground: #b3b3b3;
+    --accent: #252525;
+    --accent-foreground: #ffffff;
+    --destructive: #f3727f;
+    --border: #272727;
+    --input: #272727;
+    --ring: #1ed760;
+    --spotify-green: #1ed760;
+    --spotify-green-hover: #1fdf64;
   }
 
   * {

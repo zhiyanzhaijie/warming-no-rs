@@ -135,7 +135,7 @@ export function ProcessingPage() {
     ?? (transkun.error instanceof Error ? transkun.error.message : '正在确认本地 Python 环境。')
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#030303] text-white/90">
+    <div className="immersive-dark flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#030303] text-white/90">
       <header className="flex min-h-24 shrink-0 items-center justify-between gap-6 border-b border-white/10 px-8 py-5 max-[720px]:min-h-20 max-[720px]:px-5">
         <div className="min-w-0">
           <div className="flex items-center gap-3 text-[9px] font-bold tracking-[0.35em] text-white/25">

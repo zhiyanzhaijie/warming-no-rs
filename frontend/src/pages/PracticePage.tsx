@@ -61,7 +61,7 @@ export function PracticePage() {
   }, [availableModes, mode, setMode])
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#030303] text-foreground">
+    <div className="immersive-dark relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#030303] text-foreground">
       <header className="relative z-30 shrink-0 border-b border-white/10 bg-[#030303]/95 backdrop-blur-md">
         {consoleExpanded ? (
         <div className="relative flex min-h-16 items-center px-5 lg:px-8">

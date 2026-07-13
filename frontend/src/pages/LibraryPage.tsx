@@ -97,7 +97,7 @@ export function LibraryPage() {
   }
 
   return (
-    <div className="relative flex h-full w-full overflow-hidden bg-background font-sans text-foreground/90">
+    <div className="immersive-dark relative flex h-full w-full overflow-hidden bg-background font-sans text-foreground/90">
       {/* Background Video */}
       <video
         autoPlay
