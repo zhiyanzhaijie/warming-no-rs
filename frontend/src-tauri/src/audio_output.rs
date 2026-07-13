@@ -132,6 +132,11 @@ impl AudioOutput {
         self.send_input(events)
     }
 
+    fn restart(&self, events: Vec<MidiEvent>) -> Result<(), String> {
+        self.stop_all()?;
+        self.send(events)
+    }
+
     fn status(&self) -> AudioOutputStatus {
         AudioOutputStatus {
             available: self.sender.is_some(),
@@ -370,4 +375,12 @@ pub fn audio_send_computer_input_events(
 #[tauri::command]
 pub fn audio_stop_all(output: tauri::State<'_, AudioOutput>) -> Result<(), String> {
     output.stop_all()
+}
+
+#[tauri::command]
+pub fn audio_restart_events(
+    output: tauri::State<'_, AudioOutput>,
+    events: Vec<MidiEvent>,
+) -> Result<(), String> {
+    output.restart(events)
 }

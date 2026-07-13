@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { PianoInputDeviceDescriptor } from './types'
+import { normalizeCalibratedRange } from './midiPitchMapping'
 
 export const computerKeyboardDevice: PianoInputDeviceDescriptor = {
   id: 'computer-keyboard-61',
@@ -9,6 +10,7 @@ export const computerKeyboardDevice: PianoInputDeviceDescriptor = {
   keyCount: 61,
   lowestPitch: 36,
   highestPitch: 96,
+  pitchOffset: 0,
   supportsVelocity: false,
   supportsSustain: false,
   calibrated: true,
@@ -34,15 +36,22 @@ export const useInstrumentStore = create<InstrumentState>()(persist((set) => ({
         computerKeyboardDevice,
         ...midiDevices.map((device) => {
           const profile = state.devices.find((item) => item.id === device.id)
-          return profile?.calibrated
-            ? {
-                ...device,
-                keyCount: profile.keyCount,
-                lowestPitch: profile.lowestPitch,
-                highestPitch: profile.highestPitch,
-                calibrated: true,
-              }
-            : device
+          if (profile?.calibrated && profile.lowestPitch !== null && profile.highestPitch !== null) {
+            const range = normalizeCalibratedRange(
+              profile.lowestPitch,
+              profile.highestPitch,
+              profile.pitchOffset,
+            )
+            return {
+              ...device,
+              keyCount: range.highestPitch - range.lowestPitch + 1,
+              lowestPitch: range.lowestPitch,
+              highestPitch: range.highestPitch,
+              pitchOffset: range.pitchOffset,
+              calibrated: true,
+            }
+          }
+          return device
         }),
       ],
       activeDeviceId: [computerKeyboardDevice, ...midiDevices].some(
@@ -54,19 +63,23 @@ export const useInstrumentStore = create<InstrumentState>()(persist((set) => ({
   setActiveDevice: (activeDeviceId) => set({ activeDeviceId }),
   setStatus: (status) => set({ status }),
   calibrateDevice: (deviceId, lowestPitch, highestPitch) =>
-    set((state) => ({
-      devices: state.devices.map((device) =>
-        device.id === deviceId
-          ? {
-              ...device,
-              lowestPitch,
-              highestPitch,
-              keyCount: highestPitch - lowestPitch + 1,
-              calibrated: true,
-            }
-          : device,
-      ),
-    })),
+    set((state) => {
+      const range = normalizeCalibratedRange(lowestPitch, highestPitch)
+      return {
+        devices: state.devices.map((device) =>
+          device.id === deviceId
+            ? {
+                ...device,
+                lowestPitch: range.lowestPitch,
+                highestPitch: range.highestPitch,
+                pitchOffset: range.pitchOffset,
+                keyCount: range.highestPitch - range.lowestPitch + 1,
+                calibrated: true,
+              }
+            : device,
+        ),
+      }
+    }),
 }), {
   name: 'agent-piano-input-v1',
   partialize: (state) => ({

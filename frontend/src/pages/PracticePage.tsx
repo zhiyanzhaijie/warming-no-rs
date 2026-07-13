@@ -16,6 +16,7 @@ import { FallingNotes } from '../features/performance/FallingNotes'
 import { MeasureProgress } from '../features/practice/MeasureProgress'
 import { PlaybackCluster, TransportControls } from '../features/practice/TransportControls'
 import { usePracticeStore } from '../features/practice/practiceStore'
+import { usePracticeShortcuts } from '../features/practice/usePracticeShortcuts'
 import type { PracticeMode, ScoreNote } from '../shared/types/domain'
 
 export function PracticePage() {
@@ -25,6 +26,7 @@ export function PracticePage() {
   const mode = usePracticeStore((state) => state.mode)
   const setMode = usePracticeStore((state) => state.setMode)
   const [consoleExpanded, setConsoleExpanded] = useState(true)
+  const [agentPanelOpen, setAgentPanelOpen] = useState(false)
 
   const { data: pieces = [] } = useQuery({
     queryKey: ['pieces'],
@@ -48,6 +50,10 @@ export function PracticePage() {
   const availableModes = useMemo(
     () => buildAvailableModes(score?.notes ?? []),
     [score?.notes],
+  )
+  usePracticeShortcuts(
+    availableModes,
+    () => setAgentPanelOpen((open) => !open),
   )
 
   useEffect(() => {
@@ -76,7 +82,7 @@ export function PracticePage() {
             <div className="max-[860px]:hidden">
               <TransportControls compact availableModes={availableModes} />
             </div>
-            <Sheet>
+            <Sheet open={agentPanelOpen} onOpenChange={setAgentPanelOpen}>
               <SheetTrigger asChild>
                 <button
                   type="button"

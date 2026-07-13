@@ -43,10 +43,11 @@ export function InputDeviceControl() {
       if (event.type !== 'noteOn' || event.sourceId !== activeDevice.id) return
       setLastPitch(event.pitch)
       if (!calibrating) return
+      const rawPitch = event.rawPitch ?? event.pitch
       setObservedRange((range) =>
         range
-          ? [Math.min(range[0], event.pitch), Math.max(range[1], event.pitch)]
-          : [event.pitch, event.pitch],
+          ? [Math.min(range[0], rawPitch), Math.max(range[1], rawPitch)]
+          : [rawPitch, rawPitch],
       )
     })
   }, [activeDevice.id, calibrating])

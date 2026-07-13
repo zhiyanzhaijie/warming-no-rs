@@ -45,6 +45,7 @@ pub fn run() {
             audio_output::audio_send_input_events,
             audio_output::audio_send_computer_input_events,
             audio_output::audio_stop_all,
+            audio_output::audio_restart_events,
             midi_input::midi_list_inputs,
             midi_input::midi_connect_input,
             midi_input::midi_disconnect_input

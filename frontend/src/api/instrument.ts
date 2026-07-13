@@ -15,6 +15,14 @@ export type AudioOutputStatus = {
   detail: string
 }
 
+let playbackCommand = Promise.resolve<unknown>(undefined)
+
+function enqueuePlaybackCommand<T>(command: () => Promise<T | undefined>) {
+  const next = playbackCommand.then(command, command)
+  playbackCommand = next.catch(() => undefined)
+  return next
+}
+
 async function invokeDesktop<T>(command: string, args?: Record<string, unknown>) {
   if (!isTauriRuntime()) return undefined
   const { invoke } = await import('@tauri-apps/api/core')
@@ -24,10 +32,14 @@ async function invokeDesktop<T>(command: string, args?: Record<string, unknown>)
 export const instrumentOutput = {
   status: () => invokeDesktop<AudioOutputStatus>('audio_output_status'),
   send: (events: MidiEvent[]) =>
-    events.length === 0 ? Promise.resolve(undefined) : invokeDesktop<void>('audio_send_events', { events }),
+    events.length === 0
+      ? Promise.resolve(undefined)
+      : enqueuePlaybackCommand(() => invokeDesktop<void>('audio_send_events', { events })),
   sendComputerInput: (events: MidiEvent[]) =>
     events.length === 0 ? Promise.resolve(undefined) : invokeDesktop<void>('audio_send_computer_input_events', { events }),
   sendMidiInput: (events: MidiEvent[]) =>
     events.length === 0 ? Promise.resolve(undefined) : invokeDesktop<void>('audio_send_input_events', { events }),
-  stopAll: () => invokeDesktop<void>('audio_stop_all'),
+  stopAll: () => enqueuePlaybackCommand(() => invokeDesktop<void>('audio_stop_all')),
+  restart: (events: MidiEvent[]) =>
+    enqueuePlaybackCommand(() => invokeDesktop<void>('audio_restart_events', { events })),
 }

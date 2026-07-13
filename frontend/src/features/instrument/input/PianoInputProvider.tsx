@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { pianoInputBus } from './PianoInputBus'
 import { connectMidiInput, listenToMidiInput, listMidiInputs } from './midiInputApi'
 import { computerKeyboardDevice, useInstrumentStore } from './instrumentStore'
+import { normalizeMidiInputEvent } from './midiPitchMapping'
 
 export function PianoInputProvider({ children }: { children: ReactNode }) {
   const setMidiDevices = useInstrumentStore((state) => state.setMidiDevices)
@@ -9,7 +10,11 @@ export function PianoInputProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     let unlisten: () => void = () => undefined
-    void Promise.all([listMidiInputs(), listenToMidiInput((event) => pianoInputBus.emit(event))])
+    void Promise.all([listMidiInputs(), listenToMidiInput((event) => {
+      const state = useInstrumentStore.getState()
+      const device = state.devices.find((item) => item.id === event.sourceId)
+      pianoInputBus.emit(normalizeMidiInputEvent(event, device))
+    })])
       .then(([devices, stopListening]) => {
         if (cancelled) {
           stopListening()
@@ -23,6 +28,7 @@ export function PianoInputProvider({ children }: { children: ReactNode }) {
             keyCount: null,
             lowestPitch: null,
             highestPitch: null,
+            pitchOffset: 0,
             supportsVelocity: true,
             supportsSustain: true,
             calibrated: false,

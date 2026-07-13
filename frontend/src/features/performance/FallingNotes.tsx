@@ -13,8 +13,8 @@ import { usePracticeStore } from '../practice/practiceStore'
 import { cn } from '@/lib/utils'
 import { PianoKeyboard } from './PianoKeyboard'
 import type { PianoKeyboardHandle } from './PianoKeyboard'
-import { buildPianoKeyGeometry, keyGeometryForPitch } from './pianoGeometry'
-import type { PianoKeyGeometry } from './pianoGeometry'
+import { buildPianoKeyGeometry, layoutPianoKeys } from './pianoGeometry'
+import type { PianoKeyLayout } from './pianoGeometry'
 import type { PianoKeyState } from './pianoState'
 
 type FallingNotesProps = {
@@ -22,7 +22,7 @@ type FallingNotesProps = {
 }
 
 type PreparedNote = ScoreNote & {
-  key: PianoKeyGeometry
+  key: PianoKeyLayout
   height: number
   opacity: number
   colorClassName: string
@@ -57,6 +57,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
   const mode = usePracticeStore((state) => state.mode)
   const seekRequest = usePracticeStore((state) => state.seekRequest)
   const setCurrentBeat = usePracticeStore((state) => state.setCurrentBeat)
+  const pausePlayback = usePracticeStore((state) => state.pausePlayback)
   const inputDevices = useInstrumentStore((state) => state.devices)
   const activeDeviceId = useInstrumentStore((state) => state.activeDeviceId)
   const activeInputDevice = inputDevices.find((device) => device.id === activeDeviceId) ?? inputDevices[0]
@@ -67,19 +68,8 @@ export function FallingNotes({ score }: FallingNotesProps) {
     () => buildPianoKeyGeometry(rangeStart, rangeEnd),
     [rangeEnd, rangeStart],
   )
-  const activeKeyByPitch = useMemo(
-    () => new Map(activePianoKeys.map((key) => [key.pitch, key])),
-    [activePianoKeys],
-  )
-  const octaveGuides = useMemo(
-    () => activePianoKeys.filter((key) => key.pitch % 12 === 0 && !key.isBlack),
-    [activePianoKeys],
-  )
-  const innerPitchGuides = useMemo(
-    () => activePianoKeys.filter((key) => key.pitch % 12 === 5 && !key.isBlack),
-    [activePianoKeys],
-  )
   const [pixelsPerBeat, setPixelsPerBeat] = useState(88)
+  const [horizontalTrackWidth, setHorizontalTrackWidth] = useState(0)
   const [renderWindow, setRenderWindow] = useState({ pieceId: score?.pieceId, beat: 0 })
   const [, startRenderTransition] = useTransition()
   const noteViewportRef = useRef<HTMLDivElement | null>(null)
@@ -103,12 +93,32 @@ export function FallingNotes({ score }: FallingNotesProps) {
   if (practiceEngineRef.current === null) practiceEngineRef.current = new PracticeEngine()
   const activePitchCountsRef = useRef<Map<number, number>>(new Map())
 
+  const pianoKeyLayout = useMemo(
+    () => layoutPianoKeys(activePianoKeys, horizontalTrackWidth),
+    [activePianoKeys, horizontalTrackWidth],
+  )
+  const activeKeyByPitch = useMemo(
+    () => new Map(pianoKeyLayout.map((key) => [key.pitch, key])),
+    [pianoKeyLayout],
+  )
+  const octaveGuides = useMemo(
+    () => pianoKeyLayout.filter((key) => key.pitch % 12 === 0 && !key.isBlack),
+    [pianoKeyLayout],
+  )
+  const innerPitchGuides = useMemo(
+    () => pianoKeyLayout.filter((key) => key.pitch % 12 === 5 && !key.isBlack),
+    [pianoKeyLayout],
+  )
+
   const notes = useMemo(
     () => (score?.notes ?? []).toSorted((a, b) => a.startBeat - b.startBeat),
     [score?.notes],
   )
   const autoPlayNotes = useMemo(() => selectAutoPlayNotes(notes, mode), [mode, notes])
-  const pianoKeyEvents = useMemo(() => buildPianoKeyEvents(autoPlayNotes), [autoPlayNotes])
+  const pianoKeyEvents = useMemo(
+    () => buildPianoKeyEvents(autoPlayNotes, activeKeyByPitch),
+    [activeKeyByPitch, autoPlayNotes],
+  )
   const midiEvents = useMemo(() => buildMidiPlaybackEvents(autoPlayNotes), [autoPlayNotes])
   const handleUserNoteOn = useCallback((pitch: number) => {
     practiceEngineRef.current?.receiveNoteOn(pitch)
@@ -154,6 +164,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
     const observer = new ResizeObserver(([entry]) => {
       const nextPixelsPerBeat = entry.contentRect.height / (beatsPerMeasure * visibleMeasureCount)
       setPixelsPerBeat(Math.max(1, nextPixelsPerBeat))
+      setHorizontalTrackWidth(entry.contentRect.width)
     })
     observer.observe(viewport)
     return () => observer.disconnect()
@@ -176,6 +187,40 @@ export function FallingNotes({ score }: FallingNotesProps) {
     renderTransitionPendingRef.current = false
   }, [beatsPerMeasure, pixelsPerBeat, renderStartBeat, renderWindowBeat, score?.totalBeats])
 
+  const synchronizePosition = useEffectEvent((targetBeat: number, resumeAudio: boolean) => {
+    currentBeatRef.current = targetBeat
+    lastFrameAtRef.current = null
+    nextMidiEventIndexRef.current = upperBoundMidiEvent(midiEvents, targetBeat)
+    nextKeyEventIndexRef.current = 0
+    practiceEngineRef.current?.reset(targetBeat)
+    activePitchCountsRef.current.clear()
+    pianoKeyboardRef.current?.reset()
+    processPianoKeyEvents(
+      pianoKeyEvents,
+      targetBeat,
+      nextKeyEventIndexRef,
+      activePitchCountsRef,
+      pianoKeyboardRef.current,
+    )
+    setCurrentBeat(targetBeat)
+    if (beatLabelRef.current) {
+      beatLabelRef.current.textContent = `${Math.round(targetBeat)} / ${Math.ceil(score?.totalBeats ?? 0)} 拍`
+    }
+    const windowBeat = Math.floor(targetBeat / beatsPerMeasure) * beatsPerMeasure
+    setRenderWindow({ pieceId: score?.pieceId, beat: windowBeat })
+    // Keep the current DOM in its existing coordinate system until React
+    // commits the newly prepared render window.
+    updateTimelineTransform(
+      timelineRef.current,
+      targetBeat,
+      renderStartBeatRef.current,
+      pixelsPerBeatRef.current,
+    )
+    restartInstrument(
+      resumeAudio ? buildActiveMidiEventsAtBeat(autoPlayNotes, targetBeat) : [],
+    )
+  })
+
   useEffect(() => {
     if (!isPlaying) {
       lastFrameAtRef.current = null
@@ -184,7 +229,11 @@ export function FallingNotes({ score }: FallingNotesProps) {
       return
     }
 
-    playSustainingNotesAtBeat(autoPlayNotes, currentBeatRef.current)
+    if (currentBeatRef.current >= (score?.totalBeats ?? 0)) {
+      synchronizePosition(loopEnabled && loopRange ? loopRange.startBeat : 0, true)
+    } else {
+      restartInstrument(buildActiveMidiEventsAtBeat(autoPlayNotes, currentBeatRef.current))
+    }
 
     let frame = 0
     const tick = (now: number) => {
@@ -209,23 +258,19 @@ export function FallingNotes({ score }: FallingNotesProps) {
         (nextBeat < loopRange.startBeat || nextBeat >= loopRange.endBeat)
       ) {
         nextBeat = loopRange.startBeat
-        stopInstrument()
-        nextMidiEventIndexRef.current = lowerBoundMidiEvent(midiEvents, nextBeat)
-        nextKeyEventIndexRef.current = 0
-        practiceEngineRef.current?.reset(nextBeat)
-        activePitchCountsRef.current.clear()
-        pianoKeyboardRef.current?.reset()
-        processPianoKeyEvents(
-          pianoKeyEvents,
+        synchronizePosition(nextBeat, true)
+      } else if (nextBeat >= totalBeatsRef.current) {
+        nextBeat = totalBeatsRef.current
+        currentBeatRef.current = nextBeat
+        updateTimelineTransform(
+          timelineRef.current,
           nextBeat,
-          nextKeyEventIndexRef,
-          activePitchCountsRef,
-          pianoKeyboardRef.current,
+          renderStartBeatRef.current,
+          pixelsPerBeatRef.current,
         )
-        setRenderWindow({
-          pieceId: score?.pieceId,
-          beat: Math.floor(nextBeat / beatsPerMeasureRef.current) * beatsPerMeasureRef.current,
-        })
+        setCurrentBeat(nextBeat)
+        pausePlayback()
+        return
       }
       currentBeatRef.current = nextBeat
 
@@ -273,51 +318,17 @@ export function FallingNotes({ score }: FallingNotesProps) {
       cancelAnimationFrame(frame)
       lastFrameAtRef.current = null
     }
-  }, [autoPlayNotes, isPlaying, loopEnabled, loopRange, midiEvents, mode, notes, pianoKeyEvents, score?.pieceId, setCurrentBeat, startRenderTransition])
+  }, [autoPlayNotes, isPlaying, loopEnabled, loopRange, midiEvents, mode, notes, pausePlayback, pianoKeyEvents, score?.pieceId, score?.totalBeats, setCurrentBeat, startRenderTransition])
 
   useLayoutEffect(() => {
-    currentBeatRef.current = 0
-    nextMidiEventIndexRef.current = 0
-    nextKeyEventIndexRef.current = 0
-    practiceEngineRef.current?.reset(0)
-    activePitchCountsRef.current.clear()
-    lastFrameAtRef.current = null
-    setCurrentBeat(0)
-    setRenderWindow({ pieceId: score?.pieceId, beat: 0 })
-    pianoKeyboardRef.current?.reset()
-    stopInstrument()
+    synchronizePosition(0, false)
   }, [mode, score?.pieceId, setCurrentBeat])
 
   useLayoutEffect(() => {
     if (!seekRequest || seekRequest.pieceId !== score?.pieceId) return
 
     const targetBeat = Math.max(0, Math.min(seekRequest.beat, score?.totalBeats ?? 0))
-    currentBeatRef.current = targetBeat
-    lastFrameAtRef.current = null
-    nextMidiEventIndexRef.current = lowerBoundMidiEvent(midiEvents, targetBeat)
-    nextKeyEventIndexRef.current = 0
-    practiceEngineRef.current?.reset(targetBeat)
-    activePitchCountsRef.current.clear()
-    pianoKeyboardRef.current?.reset()
-    processPianoKeyEvents(
-      pianoKeyEvents,
-      targetBeat,
-      nextKeyEventIndexRef,
-      activePitchCountsRef,
-      pianoKeyboardRef.current,
-    )
-    stopInstrument()
-    if (isPlayingRef.current) {
-      playSustainingNotesAtBeat(autoPlayNotes, targetBeat)
-    }
-    setCurrentBeat(targetBeat)
-    if (beatLabelRef.current) {
-      beatLabelRef.current.textContent = `${Math.round(targetBeat)} / ${Math.ceil(score?.totalBeats ?? 0)} 拍`
-    }
-    setRenderWindow({
-      pieceId: score?.pieceId,
-      beat: Math.floor(targetBeat / beatsPerMeasure) * beatsPerMeasure,
-    })
+    synchronizePosition(targetBeat, isPlayingRef.current)
   }, [autoPlayNotes, beatsPerMeasure, midiEvents, notes, pianoKeyEvents, score?.pieceId, score?.totalBeats, seekRequest, setCurrentBeat])
 
   useLayoutEffect(() => {
@@ -347,7 +358,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
             <div
               key={`octave-${guide.pitch}`}
               className="absolute inset-y-0 z-0 w-px bg-white/10"
-              style={{ left: `${guide.leftPercent}%` }}
+              style={{ left: `${guide.leftPx}px` }}
             />
           ))}
 
@@ -355,7 +366,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
             <div
               key={`inner-${guide.pitch}`}
               className="absolute inset-y-0 z-0 w-px bg-white/8"
-              style={{ left: `${guide.leftPercent}%` }}
+              style={{ left: `${guide.leftPx}px` }}
             />
           ))}
 
@@ -396,7 +407,8 @@ export function FallingNotes({ score }: FallingNotesProps) {
             ? computerKeyboardLabelByPitch
             : undefined
         }
-        keys={activePianoKeys}
+        keys={pianoKeyLayout}
+        width={horizontalTrackWidth}
       />
     </section>
   )
@@ -433,7 +445,7 @@ function prepareNotes(
   pixelsPerBeat: number,
   renderStartBeat: number,
   renderEndBeat: number,
-  keyByPitch: ReadonlyMap<number, PianoKeyGeometry>,
+  keyByPitch: ReadonlyMap<number, PianoKeyLayout>,
 ): PreparedNote[] {
   const preparedNotes: PreparedNote[] = []
   for (const note of notes) {
@@ -462,10 +474,10 @@ function initialNoteStyle(
   pixelsPerBeat: number,
 ): CSSProperties {
   return {
-    left: `${note.key.leftPercent}%`,
+    left: `${note.key.leftPx}px`,
     bottom: `${(note.startBeat - renderStartBeat) * pixelsPerBeat}px`,
     height: `${note.height}px`,
-    width: `${note.key.widthPercent}%`,
+    width: `${note.key.widthPx}px`,
     opacity: note.opacity,
   }
 }
@@ -554,14 +566,17 @@ function buildMeasureGuides(totalBeats: number, timeSignature: string): MeasureG
   return buildMeasureTimings(totalBeats, timeSignature)
 }
 
-function buildPianoKeyEvents(notes: ScoreNote[]): PianoKeyEvent[] {
+function buildPianoKeyEvents(
+  notes: ScoreNote[],
+  keyByPitch: ReadonlyMap<number, PianoKeyLayout>,
+): PianoKeyEvent[] {
   const events: PianoKeyEvent[] = []
   for (const note of notes) {
-    if (!keyGeometryForPitch(note.pitch)) continue
+    if (!keyByPitch.has(note.pitch)) continue
     events.push({ beat: note.startBeat, pitch: note.pitch, delta: 1 })
     events.push({ beat: note.startBeat + note.durationBeats, pitch: note.pitch, delta: -1 })
   }
-  return events.toSorted((first, second) => first.beat - second.beat || second.delta - first.delta)
+  return events.toSorted((first, second) => first.beat - second.beat || first.delta - second.delta)
 }
 
 function processPianoKeyEvents(
@@ -592,12 +607,12 @@ function processPianoKeyEvents(
   if (changes.size > 0) keyboard.applyKeyStates(changes)
 }
 
-function lowerBoundMidiEvent(events: PlaybackMidiEvent[], targetBeat: number) {
+function upperBoundMidiEvent(events: PlaybackMidiEvent[], targetBeat: number) {
   let low = 0
   let high = events.length
   while (low < high) {
     const middle = low + Math.floor((high - low) / 2)
-    if (events[middle].beat < targetBeat) {
+    if (events[middle].beat <= targetBeat) {
       low = middle + 1
     } else {
       high = middle
@@ -606,10 +621,10 @@ function lowerBoundMidiEvent(events: PlaybackMidiEvent[], targetBeat: number) {
   return low
 }
 
-function playSustainingNotesAtBeat(notes: ScoreNote[], targetBeat: number) {
+function buildActiveMidiEventsAtBeat(notes: ScoreNote[], targetBeat: number) {
   const events: MidiEvent[] = []
   for (const note of notes) {
-    if (note.startBeat >= targetBeat) break
+    if (note.startBeat > targetBeat) break
     if (note.startBeat + note.durationBeats <= targetBeat) continue
     events.push({
       type: 'noteOn',
@@ -618,5 +633,11 @@ function playSustainingNotesAtBeat(notes: ScoreNote[], targetBeat: number) {
       velocity: Math.max(1, Math.min(127, note.velocity)),
     })
   }
-  sendMidiEvents(events)
+  return events
+}
+
+function restartInstrument(events: MidiEvent[]) {
+  void instrumentOutput.restart(events).catch((error: unknown) => {
+    console.error('Unable to restart audio output', error)
+  })
 }

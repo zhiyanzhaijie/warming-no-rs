@@ -17,6 +17,7 @@ type PracticeState = {
   requestSeek: (pieceId: string, beat: number) => void
   setMode: (mode: PracticeMode) => void
   togglePlayback: () => void
+  pausePlayback: () => void
   toggleLoop: () => void
   beginLoopSelection: () => void
   selectLoopMeasure: (measure: LoopMeasure) => void
@@ -58,6 +59,7 @@ export const usePracticeStore = create<PracticeState>((set) => ({
     set((state) =>
       state.mode !== 'free' ? { isPlaying: !state.isPlaying } : state,
     ),
+  pausePlayback: () => set({ isPlaying: false }),
   toggleLoop: () =>
     set((state) =>
       state.loopRange

@@ -2,7 +2,7 @@ import { memo, useImperativeHandle, useState } from 'react'
 import type { Ref } from 'react'
 import { cn } from '@/lib/utils'
 import { blackKeyLengthRatio, visibleWhiteKeyLengthRatio } from './pianoGeometry'
-import type { PianoKeyGeometry } from './pianoGeometry'
+import type { PianoKeyLayout } from './pianoGeometry'
 import type { PianoKeyState } from './pianoState'
 
 export type PianoKeyboardHandle = {
@@ -14,10 +14,12 @@ export const PianoKeyboard = memo(function PianoKeyboard({
   ref,
   keyLabels,
   keys,
+  width,
 }: {
   ref?: Ref<PianoKeyboardHandle>
   keyLabels?: ReadonlyMap<number, string>
-  keys: readonly PianoKeyGeometry[]
+  keys: readonly PianoKeyLayout[]
+  width: number
 }) {
   const [keyStates, setKeyStates] = useState<ReadonlyMap<number, PianoKeyState>>(() => new Map())
   const whiteKeys = keys.filter((key) => !key.isBlack)
@@ -41,6 +43,7 @@ export const PianoKeyboard = memo(function PianoKeyboard({
       className="relative isolate w-full shrink-0 overflow-hidden border-t border-white/10 bg-[#080808] [contain:paint]"
       style={{
         aspectRatio: `${whiteKeys.length} / ${visibleWhiteKeyLengthRatio}`,
+        width: `${width}px`,
       }}
     >
       {whiteKeys.map((key) => (
@@ -80,11 +83,11 @@ const PianoKey = memo(function PianoKey({
   state,
   label,
 }: {
-  geometry: PianoKeyGeometry
+  geometry: PianoKeyLayout
   state: PianoKeyState
   label?: string
 }) {
-  const { isBlack, leftPercent, widthPercent } = geometry
+  const { isBlack, leftPx, widthPx } = geometry
   return (
     <div
       className={cn(
@@ -96,8 +99,8 @@ const PianoKey = memo(function PianoKey({
         state === 'incorrect' && (isBlack ? 'bg-[#343434]' : 'bg-[#8f8f8f]'),
       )}
       style={{
-        left: `${leftPercent}%`,
-        width: `${widthPercent}%`,
+        left: `${leftPx}px`,
+        width: `${widthPx}px`,
         height: isBlack ? `${blackKeyLengthRatio * 100}%` : '100%',
       }}
     >

@@ -5,6 +5,11 @@ export type PianoKeyGeometry = {
   widthPercent: number
 }
 
+export type PianoKeyLayout = PianoKeyGeometry & {
+  leftPx: number
+  widthPx: number
+}
+
 export const keyboardStartPitch = 36
 export const keyboardKeyCount = 61
 export const keyboardEndPitch = keyboardStartPitch + keyboardKeyCount - 1
@@ -67,6 +72,17 @@ export function buildPianoKeyGeometry(startPitch: number, endPitch: number): Pia
   }
 
   return keys
+}
+
+export function layoutPianoKeys(
+  keys: readonly PianoKeyGeometry[],
+  width: number,
+): PianoKeyLayout[] {
+  return keys.map((key) => ({
+    ...key,
+    leftPx: (key.leftPercent / 100) * width,
+    widthPx: (key.widthPercent / 100) * width,
+  }))
 }
 
 function isBlackPitch(pitch: number) {
