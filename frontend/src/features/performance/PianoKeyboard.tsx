@@ -38,7 +38,7 @@ export const PianoKeyboard = memo(function PianoKeyboard({
 
   return (
     <div
-      className="relative isolate w-full shrink-0 overflow-hidden rounded-b-[4px] bg-[#080808] [contain:paint]"
+      className="relative isolate w-full shrink-0 overflow-hidden border-t border-white/10 bg-[#080808] [contain:paint]"
       style={{
         aspectRatio: `${whiteKeys.length} / ${visibleWhiteKeyLengthRatio}`,
       }}
@@ -88,7 +88,7 @@ const PianoKey = memo(function PianoKey({
   return (
     <div
       className={cn(
-        'absolute rounded-b-[3px] [contain:paint]',
+        'absolute [contain:paint]',
         isBlack
           ? 'top-0 z-10 bg-[#070707] shadow-[0_3px_6px_rgba(0,0,0,0.55),inset_0_-8px_12px_rgba(255,255,255,0.07)]'
           : 'inset-y-0 border-r border-[#aaa] bg-[#f1f1f1] shadow-[inset_0_-8px_14px_rgba(0,0,0,0.14)] first:border-l',

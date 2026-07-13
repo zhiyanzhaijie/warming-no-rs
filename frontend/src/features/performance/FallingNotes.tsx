@@ -52,6 +52,8 @@ const renderBehindMeasureCount = 2
 export function FallingNotes({ score }: FallingNotesProps) {
   const bpm = usePracticeStore((state) => state.bpm)
   const isPlaying = usePracticeStore((state) => state.isPlaying)
+  const loopEnabled = usePracticeStore((state) => state.loopEnabled)
+  const loopRange = usePracticeStore((state) => state.loopRange)
   const mode = usePracticeStore((state) => state.mode)
   const seekRequest = usePracticeStore((state) => state.seekRequest)
   const setCurrentBeat = usePracticeStore((state) => state.setCurrentBeat)
@@ -200,6 +202,31 @@ export function FallingNotes({ score }: FallingNotesProps) {
           )
         }
       }
+
+      if (
+        loopEnabled &&
+        loopRange &&
+        (nextBeat < loopRange.startBeat || nextBeat >= loopRange.endBeat)
+      ) {
+        nextBeat = loopRange.startBeat
+        stopInstrument()
+        nextMidiEventIndexRef.current = lowerBoundMidiEvent(midiEvents, nextBeat)
+        nextKeyEventIndexRef.current = 0
+        practiceEngineRef.current?.reset(nextBeat)
+        activePitchCountsRef.current.clear()
+        pianoKeyboardRef.current?.reset()
+        processPianoKeyEvents(
+          pianoKeyEvents,
+          nextBeat,
+          nextKeyEventIndexRef,
+          activePitchCountsRef,
+          pianoKeyboardRef.current,
+        )
+        setRenderWindow({
+          pieceId: score?.pieceId,
+          beat: Math.floor(nextBeat / beatsPerMeasureRef.current) * beatsPerMeasureRef.current,
+        })
+      }
       currentBeatRef.current = nextBeat
 
       updateTimelineTransform(
@@ -220,7 +247,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
       if (now - lastBeatLabelAtRef.current >= beatLabelIntervalMs) {
         lastBeatLabelAtRef.current = now
         if (beatLabelRef.current) {
-          beatLabelRef.current.textContent = `${Math.round(nextBeat)} / ${Math.ceil(totalBeatsRef.current)} beats`
+          beatLabelRef.current.textContent = `${Math.round(nextBeat)} / ${Math.ceil(totalBeatsRef.current)} 拍`
         }
         setCurrentBeat(nextBeat)
 
@@ -246,7 +273,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
       cancelAnimationFrame(frame)
       lastFrameAtRef.current = null
     }
-  }, [autoPlayNotes, isPlaying, midiEvents, mode, notes, pianoKeyEvents, score?.pieceId, setCurrentBeat, startRenderTransition])
+  }, [autoPlayNotes, isPlaying, loopEnabled, loopRange, midiEvents, mode, notes, pianoKeyEvents, score?.pieceId, setCurrentBeat, startRenderTransition])
 
   useLayoutEffect(() => {
     currentBeatRef.current = 0
@@ -285,7 +312,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
     }
     setCurrentBeat(targetBeat)
     if (beatLabelRef.current) {
-      beatLabelRef.current.textContent = `${Math.round(targetBeat)} / ${Math.ceil(score?.totalBeats ?? 0)} beats`
+      beatLabelRef.current.textContent = `${Math.round(targetBeat)} / ${Math.ceil(score?.totalBeats ?? 0)} 拍`
     }
     setRenderWindow({
       pieceId: score?.pieceId,
@@ -298,18 +325,18 @@ export function FallingNotes({ score }: FallingNotesProps) {
   }, [pixelsPerBeat, preparedNotes.length, renderStartBeat, score?.pieceId])
 
   return (
-    <section className="relative flex h-full min-h-0 flex-col bg-card">
+    <section className="relative flex h-full min-h-0 flex-col bg-[#030303]">
       <div
         ref={noteViewportRef}
-        className="relative min-h-0 flex-1 overflow-hidden rounded-t-lg bg-card [contain:paint] [isolation:isolate]"
+        className="relative min-h-0 flex-1 overflow-hidden bg-[#030303] [contain:paint] [isolation:isolate]"
       >
-        <div className="absolute left-4 top-4 z-20 rounded-full bg-secondary px-3 py-1 text-xs font-bold uppercase tracking-[1.4px] text-muted-foreground">
+        <div className="absolute left-5 top-4 z-20 border-l border-white/20 pl-3 text-[9px] font-bold uppercase tracking-[0.22em] text-white/30 lg:left-8">
           {score ? (
             <>
-              {score.title} · <span ref={beatLabelRef}>0 / {Math.ceil(score.totalBeats)} beats</span>
+              时间轴 · <span ref={beatLabelRef}>0 / {Math.ceil(score.totalBeats)} 拍</span>
             </>
           ) : (
-            'No MIDI score'
+            '暂无可用曲谱'
           )}
         </div>
 
@@ -319,7 +346,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
           {octaveGuides.map((guide) => (
             <div
               key={`octave-${guide.pitch}`}
-              className="absolute inset-y-0 z-0 w-px bg-spotify-green/30 shadow-[0_0_12px_rgba(30,215,96,0.12)]"
+              className="absolute inset-y-0 z-0 w-px bg-white/10"
               style={{ left: `${guide.leftPercent}%` }}
             />
           ))}
@@ -332,7 +359,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
             />
           ))}
 
-          <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-spotify-green/80 shadow-[0_0_24px_rgba(30,215,96,0.65)]" />
+          <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-primary/80 shadow-[0_0_18px_rgba(30,215,96,0.35)]" />
 
           <div
             ref={timelineRef}
@@ -354,7 +381,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
             {preparedNotes.map((note) => (
               <div
                 key={note.id}
-                className={cn('absolute rounded-t-[3px]', note.colorClassName)}
+                className={cn('absolute', note.colorClassName)}
                 style={initialNoteStyle(note, renderStartBeat, pixelsPerBeat)}
               />
             ))}

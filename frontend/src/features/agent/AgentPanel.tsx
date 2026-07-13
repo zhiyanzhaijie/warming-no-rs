@@ -12,14 +12,14 @@ export function AgentPanel() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[1.6px] text-muted-foreground">
-            Practice Agent
+            练习助手
           </p>
           <h2 className="mt-1 font-title text-lg font-bold text-foreground">
             下一轮建议
           </h2>
         </div>
         <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-bold text-spotify-green">
-          Local
+          本地
         </span>
       </div>
 

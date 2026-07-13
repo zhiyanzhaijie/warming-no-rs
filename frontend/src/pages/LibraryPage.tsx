@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { RefreshCw, Library, Info, X, FolderKanban } from 'lucide-react'
+import { RefreshCw, Library, Info, X } from 'lucide-react'
 import { scoreApi } from '../api/score'
 import { PieceCard } from '../features/library/PieceCard'
 
@@ -97,7 +97,7 @@ export function LibraryPage() {
   }
 
   return (
-    <div className="relative flex h-full w-full overflow-hidden bg-[#030303] font-sans text-white/90">
+    <div className="relative flex h-full w-full overflow-hidden bg-background font-sans text-foreground/90">
       {/* Background Video */}
       <video
         autoPlay
@@ -118,32 +118,32 @@ export function LibraryPage() {
           
           {/* Top Title Group */}
           <div className="flex flex-col">
-            <div className="mb-4 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.4em] text-white/20">
-              <span className="block h-[1px] w-6 bg-white/10"></span>
+            <div className="mb-4 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.4em] text-foreground/20">
+              <span className="block h-[1px] w-6 bg-foreground/10"></span>
               <span>Warming Piano</span>
             </div>
-            <h1 className="font-title text-5xl font-extrabold tracking-tighter text-white sm:text-6xl">
+            <h1 className="font-title text-5xl font-extrabold tracking-tighter text-foreground sm:text-6xl">
               钢琴曲库
             </h1>
-            <p className="mt-5 text-sm font-medium leading-relaxed text-white/40 max-w-sm">
+            <p className="mt-5 text-sm font-medium leading-relaxed text-muted-foreground max-w-sm">
               专为落键钢琴练习打造的个人曲库。<br />
               导入本地 MIDI 目录，自动解析生成极简下落音符谱面。
             </p>
           </div>
 
           {/* Center Integration Group: Directories, Status, and Controls in ONE solid block */}
-          <div className="flex flex-col gap-6 border border-white/10 bg-transparent p-6 w-full">
+          <div className="flex flex-col gap-6 border border-border/40 bg-transparent p-6 w-full">
             {/* Folder Connection Action */}
             <div className="flex items-center justify-between gap-4">
               <div className="flex flex-col">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">MIDI 文件夹</h3>
-                <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-white/40">关联本地文件夹，扫描并同步曲目</p>
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/80">MIDI 文件夹</h3>
+                <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-muted-foreground">关联本地文件夹，扫描并同步曲目</p>
               </div>
               <button
                 type="button"
                 disabled={selectDirectories.isPending || addWatchPaths.isPending}
                 onClick={() => selectDirectories.mutate()}
-                className="flex h-8 items-center justify-center border border-white/20 bg-transparent px-4 text-[10px] font-bold uppercase tracking-widest text-white transition hover:border-white hover:bg-white hover:text-black active:scale-95"
+                className="flex h-8 items-center justify-center border border-border/40 bg-transparent px-4 text-[10px] font-bold uppercase tracking-widest text-foreground transition hover:border-foreground hover:bg-foreground hover:text-background active:scale-95"
               >
                 <span>连接</span>
               </button>
@@ -151,11 +151,11 @@ export function LibraryPage() {
 
             {/* Listening tags - directly grouped with directories */}
             {!!watchPaths?.paths?.length && (
-              <div className="flex flex-col gap-2.5 border-t border-white/10 pt-4">
-                <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/30">Listening Directories</span>
+              <div className="flex flex-col gap-2.5 border-t border-border/30 pt-4">
+                <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-muted-foreground">Listening Directories</span>
                 <div className="flex flex-col gap-1.5">
                   {watchPaths.paths.map((p) => (
-                    <span key={p} className="truncate text-[11px] font-medium tracking-wide text-white/50 hover:text-white" title={p}>
+                    <span key={p} className="truncate text-[11px] font-medium tracking-wide text-muted-foreground hover:text-foreground" title={p}>
                       {p}
                     </span>
                   ))}
@@ -165,9 +165,9 @@ export function LibraryPage() {
 
             {/* Messages/Errors - closely coupled to the operations in this card */}
             {(message || isError) && (
-              <div className="flex items-start gap-2.5 border-t border-white/10 pt-4 text-[11px] leading-relaxed">
-                <Info className="mt-0.5 size-3.5 shrink-0 text-white/40" />
-                <p className="flex-1 text-white/50">{message || (error instanceof Error ? error.message : '同步故障')}</p>
+              <div className="flex items-start gap-2.5 border-t border-border/30 pt-4 text-[11px] leading-relaxed">
+                <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/80" />
+                <p className="flex-1 text-muted-foreground">{message || (error instanceof Error ? error.message : '同步故障')}</p>
                 {message && (
                   <button type="button" onClick={() => setMessage(null)} className="opacity-40 hover:opacity-100">
                     <X className="size-3.5" />
@@ -178,11 +178,11 @@ export function LibraryPage() {
           </div>
 
           {/* Bottom Metabar & Sympathetic Action */}
-          <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-white/30">
+          <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             <button
               type="button"
               onClick={() => refresh.mutate()}
-              className="flex items-center gap-2 text-white/40 transition hover:text-white"
+              className="flex items-center gap-2 text-muted-foreground transition hover:text-foreground"
             >
               <RefreshCw className={`size-3.5 ${refresh.isPending ? 'animate-spin' : ''}`} />
               <span>刷新曲库</span>
@@ -195,11 +195,11 @@ export function LibraryPage() {
 
         {/* Right Pieces Column: Single Column, pushed completely to the right edge */}
         <aside className="flex h-full w-[360px] shrink-0 flex-col py-16 xl:w-[400px]">
-          <header className="flex shrink-0 items-center justify-between pb-6 border-b border-white/5">
-            <h2 className="font-title text-sm font-bold tracking-[0.2em] text-white/40">
+          <header className="flex shrink-0 items-center justify-between pb-6 border-b border-border/20">
+            <h2 className="font-title text-sm font-bold tracking-[0.2em] text-muted-foreground">
               REPERTOIRE
             </h2>
-            <span className="rounded-full bg-white/5 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-white/40">
+            <span className="rounded-full bg-foreground/[0.03] px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground border border-border/20">
               {pieces.length} Pieces
             </span>
           </header>

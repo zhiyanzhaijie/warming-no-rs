@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { Bot } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { scoreApi } from '../api/score'
-import { Button } from '@/components/ui/button'
 import {
   Sheet,
   SheetContent,
@@ -15,7 +14,7 @@ import {
 import { AgentPanel } from '../features/agent/AgentPanel'
 import { FallingNotes } from '../features/performance/FallingNotes'
 import { MeasureProgress } from '../features/practice/MeasureProgress'
-import { TransportControls } from '../features/practice/TransportControls'
+import { PlaybackCluster, TransportControls } from '../features/practice/TransportControls'
 import { usePracticeStore } from '../features/practice/practiceStore'
 import type { PracticeMode, ScoreNote } from '../shared/types/domain'
 
@@ -25,6 +24,8 @@ export function PracticePage() {
   const setBpm = usePracticeStore((state) => state.setBpm)
   const mode = usePracticeStore((state) => state.mode)
   const setMode = usePracticeStore((state) => state.setMode)
+  const [consoleExpanded, setConsoleExpanded] = useState(true)
+
   const { data: pieces = [] } = useQuery({
     queryKey: ['pieces'],
     queryFn: scoreApi.listPieces,
@@ -37,9 +38,7 @@ export function PracticePage() {
   })
 
   useEffect(() => {
-    if (score?.tempoBpm) {
-      setBpm(score.tempoBpm)
-    }
+    if (score?.tempoBpm) setBpm(score.tempoBpm)
   }, [score?.tempoBpm, setBpm])
 
   useEffect(() => {
@@ -56,57 +55,73 @@ export function PracticePage() {
   }, [availableModes, mode, setMode])
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 p-3 max-[720px]:p-2">
-      <header className="flex shrink-0 items-center gap-3 rounded-lg bg-card px-3 py-2 shadow-medium max-[900px]:flex-wrap">
-        <div className="min-w-[12rem] flex-1">
-          <h1 className="truncate font-title text-base font-bold text-foreground">
-            {score?.title ?? '下落音符练习'}
-          </h1>
-          <p className="truncate text-[10px] font-bold uppercase tracking-[1.8px] text-muted-foreground">
-            Synthesia Practice
-          </p>
-        </div>
+    <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#030303] text-foreground">
+      <header className="relative z-30 shrink-0 border-b border-white/10 bg-[#030303]/95 backdrop-blur-md">
+        {consoleExpanded ? (
+        <div className="relative flex min-h-16 items-center px-5 lg:px-8">
+          <div className="min-w-0 max-w-[24%]">
+            <p className="text-[9px] font-bold uppercase tracking-[0.35em] text-white/25">
+              练习演奏
+            </p>
+            <h1 className="mt-1 truncate font-title text-lg font-bold tracking-tight text-white/90">
+              {score?.title ?? '下落音符练习'}
+            </h1>
+          </div>
 
-        <div className="flex min-w-0 items-center gap-2">
-          <TransportControls compact availableModes={availableModes} />
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                className="size-10 rounded-full bg-secondary text-muted-foreground hover:text-foreground"
-                aria-label="打开 Agent"
-                title="打开 Agent"
-              >
-                <Bot className="size-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="border-border bg-card p-0 text-foreground sm:max-w-md">
-              <SheetHeader className="border-b border-border px-4 py-3">
-                <SheetTitle className="font-title text-base">Agent</SheetTitle>
-                <SheetDescription>练习辅助与分析</SheetDescription>
-              </SheetHeader>
-              <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                <AgentPanel />
-              </div>
-            </SheetContent>
-          </Sheet>
+          <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-3 max-[860px]:hidden">
+            <PlaybackCluster />
+          </div>
+
+          <div className="ml-auto flex min-w-0 items-center justify-end gap-2">
+            <div className="max-[860px]:hidden">
+              <TransportControls compact availableModes={availableModes} />
+            </div>
+            <Sheet>
+              <SheetTrigger asChild>
+                <button
+                  type="button"
+                  className="grid size-8 place-items-center border border-white/10 text-white/40 transition hover:border-white/40 hover:text-white"
+                  aria-label="打开智能助手"
+                  title="打开智能助手"
+                >
+                  <Bot className="size-3.5" />
+                </button>
+              </SheetTrigger>
+              <SheetContent className="border-l border-white/10 bg-[#080808]/95 p-0 text-foreground backdrop-blur-xl sm:max-w-md">
+                <SheetHeader className="border-b border-white/10 px-6 py-5">
+                  <p className="text-[9px] font-bold tracking-[0.3em] text-white/25">练习助手</p>
+                  <SheetTitle className="font-title text-base text-white/90">演奏分析</SheetTitle>
+                  <SheetDescription className="text-xs text-white/40">练习辅助与音准节拍诊断</SheetDescription>
+                </SheetHeader>
+                <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                  <AgentPanel />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
+        ) : null}
+
+        {consoleExpanded ? (
+          <div className="hidden border-t border-white/[0.06] px-5 py-3 max-[860px]:block">
+            <TransportControls compact availableModes={availableModes} />
+          </div>
+        ) : null}
+        <MeasureProgress
+          score={score}
+          expanded={consoleExpanded}
+          onToggleExpanded={() => setConsoleExpanded((expanded) => !expanded)}
+        />
       </header>
 
-      <MeasureProgress score={score} />
-
-      <div className="min-h-0 flex-1">
+      <main className="min-h-0 flex-1">
         <FallingNotes score={score} />
-      </div>
+      </main>
     </div>
   )
 }
 
-function buildAvailableModes(
-  notes: ScoreNote[],
-) {
+function buildAvailableModes(notes: ScoreNote[]) {
   const modes = new Set<PracticeMode>(['listen', 'free'])
   if (notes.some((note) => note.hand === 'left')) modes.add('left-hand')
   if (notes.some((note) => note.hand === 'right')) modes.add('right-hand')

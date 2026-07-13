@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { PieceScore } from '../../shared/types/domain'
 import { usePracticeStore } from './practiceStore'
 import type { MeasureTiming } from './measureTiming'
@@ -6,12 +7,18 @@ import { buildMeasureTimings, formatPlaybackTime } from './measureTiming'
 
 type MeasureProgressProps = {
   score?: PieceScore
+  expanded?: boolean
+  onToggleExpanded?: () => void
 }
 
-export function MeasureProgress({ score }: MeasureProgressProps) {
+export function MeasureProgress({ score, expanded, onToggleExpanded }: MeasureProgressProps) {
   const currentBeat = usePracticeStore((state) => state.currentBeat)
   const bpm = usePracticeStore((state) => state.bpm)
   const requestSeek = usePracticeStore((state) => state.requestSeek)
+  const loopRange = usePracticeStore((state) => state.loopRange)
+  const loopSelecting = usePracticeStore((state) => state.loopSelecting)
+  const loopSelectionAnchor = usePracticeStore((state) => state.loopSelectionAnchor)
+  const selectLoopMeasure = usePracticeStore((state) => state.selectLoopMeasure)
   const measures = useMemo(
     () => buildMeasureTimings(score?.totalBeats ?? 0, score?.timeSignature ?? '4/4'),
     [score?.timeSignature, score?.totalBeats],
@@ -21,28 +28,50 @@ export function MeasureProgress({ score }: MeasureProgressProps) {
   const secondsPerBeat = 60 / Math.max(1, bpm)
 
   return (
-    <div className="flex shrink-0 items-center gap-3 rounded-md bg-card px-3 py-2 shadow-medium">
-      <span className="w-10 text-right text-[10px] font-bold tabular-nums text-muted-foreground">
+    <div className="relative h-3 shrink-0 bg-white/[0.04]">
+      <div
+        className="pointer-events-none absolute inset-y-0 left-0 z-10 bg-primary/75"
+        style={{ width: `${progressPercent}%` }}
+      />
+
+      {loopRange && totalBeats > 0 ? (
+        <div
+          className="pointer-events-none absolute inset-y-0 z-20 border-x border-white/50 bg-white/20"
+          style={{
+            left: `${(loopRange.startBeat / totalBeats) * 100}%`,
+            width: `${((loopRange.endBeat - loopRange.startBeat) / totalBeats) * 100}%`,
+          }}
+        />
+      ) : null}
+
+      <MeasureSegments
+        measures={measures}
+        secondsPerBeat={secondsPerBeat}
+        pieceId={score?.pieceId ?? ''}
+        requestSeek={requestSeek}
+        loopSelecting={loopSelecting}
+        loopSelectionAnchorNumber={loopSelectionAnchor?.number}
+        selectLoopMeasure={selectLoopMeasure}
+      />
+
+      <span className="pointer-events-none absolute inset-y-0 left-3 z-20 flex items-center text-[8px] font-bold tracking-wider tabular-nums text-white/55 mix-blend-difference">
         {formatPlaybackTime(currentBeat * secondsPerBeat)}
       </span>
-
-      <div className="relative flex h-2 min-w-0 flex-1 overflow-visible rounded-full bg-secondary">
-        <div
-          className="pointer-events-none absolute inset-y-0 left-0 z-10 rounded-full bg-spotify-green"
-          style={{ width: `${progressPercent}%` }}
-        />
-
-        <MeasureSegments
-          measures={measures}
-          secondsPerBeat={secondsPerBeat}
-          pieceId={score?.pieceId ?? ''}
-          requestSeek={requestSeek}
-        />
-      </div>
-
-      <span className="w-10 text-[10px] font-bold tabular-nums text-muted-foreground">
+      <span className="pointer-events-none absolute inset-y-0 right-3 z-20 flex items-center text-[8px] font-bold tracking-wider tabular-nums text-white/55 mix-blend-difference">
         {formatPlaybackTime(totalBeats * secondsPerBeat)}
       </span>
+
+      {onToggleExpanded ? (
+        <button
+          type="button"
+          onClick={onToggleExpanded}
+          className="group absolute left-1/2 top-full z-40 h-4 w-24 -translate-x-1/2 cursor-pointer bg-transparent outline-none"
+          aria-label={expanded ? '收起练习控制' : '展开练习控制'}
+          title={expanded ? '收起练习控制' : '展开练习控制'}
+        >
+          <span className="absolute left-1/2 top-1 h-px w-9 -translate-x-1/2 bg-white/35 transition-all duration-300 ease-out group-hover:w-20 group-hover:bg-white/90 group-hover:shadow-[0_0_5px_rgba(255,255,255,0.9),0_0_14px_rgba(255,255,255,0.55)] group-focus-visible:w-20 group-focus-visible:bg-white/90 group-focus-visible:shadow-[0_0_5px_rgba(255,255,255,0.9),0_0_14px_rgba(255,255,255,0.55)]" />
+        </button>
+      ) : null}
     </div>
   )
 }
@@ -52,28 +81,52 @@ const MeasureSegments = memo(function MeasureSegments({
   secondsPerBeat,
   pieceId,
   requestSeek,
+  loopSelecting,
+  loopSelectionAnchorNumber,
+  selectLoopMeasure,
 }: {
   measures: MeasureTiming[]
   secondsPerBeat: number
   pieceId: string
   requestSeek: (pieceId: string, beat: number) => void
+  loopSelecting: boolean
+  loopSelectionAnchorNumber?: number
+  selectLoopMeasure: (measure: { number: number; startBeat: number; endBeat: number }) => void
 }) {
-  return measures.map((measure) => {
-    const startSeconds = measure.startBeat * secondsPerBeat
-    const durationSeconds = measure.durationBeats * secondsPerBeat
-    return (
-      <button
-        type="button"
-        key={measure.number}
-        onClick={() => requestSeek(pieceId, measure.startBeat)}
-        aria-label={`跳转到第 ${measure.number} 小节`}
-        className="group relative z-20 h-full cursor-pointer border-r border-background/80 outline-none last:border-r-0 focus-visible:bg-white/20"
-        style={{ flexGrow: measure.durationBeats, flexBasis: 0 }}
-      >
-        <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-[#282828] px-2 py-1 text-[10px] font-bold text-foreground shadow-heavy group-hover:block">
-          {measure.number} · {formatPlaybackTime(startSeconds)} · {durationSeconds.toFixed(1)}s
-        </div>
-      </button>
-    )
-  })
+  return (
+    <TooltipProvider delayDuration={180}>
+      <div className="absolute inset-0 z-20 flex">
+        {measures.map((measure) => {
+          const startSeconds = measure.startBeat * secondsPerBeat
+          const durationSeconds = measure.durationBeats * secondsPerBeat
+          return (
+            <Tooltip key={measure.number}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (loopSelecting) {
+                      selectLoopMeasure({
+                        number: measure.number,
+                        startBeat: measure.startBeat,
+                        endBeat: measure.startBeat + measure.durationBeats,
+                      })
+                    } else {
+                      requestSeek(pieceId, measure.startBeat)
+                    }
+                  }}
+                  aria-label={`跳转到第 ${measure.number} 小节`}
+                  className={`relative h-full cursor-pointer border-r border-black/25 outline-none last:border-r-0 hover:bg-white/10 focus-visible:bg-white/20 ${loopSelectionAnchorNumber === measure.number ? 'bg-white/30' : ''}`}
+                  style={{ flexGrow: measure.durationBeats, flexBasis: 0 }}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={8} className="rounded-none border border-white/10 bg-[#080808] px-2 py-1 text-[10px] font-bold text-white shadow-2xl">
+                {measure.number} · {formatPlaybackTime(startSeconds)} · {durationSeconds.toFixed(1)}s
+              </TooltipContent>
+            </Tooltip>
+          )
+        })}
+      </div>
+    </TooltipProvider>
+  )
 })
