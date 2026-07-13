@@ -122,17 +122,22 @@ fn find_transkun() -> Option<TranskunCommand> {
 }
 
 #[tauri::command]
-pub fn check_transkun() -> TranskunStatus {
-    match find_transkun() {
-        Some(command) => TranskunStatus {
+pub async fn check_transkun() -> TranskunStatus {
+    match tauri::async_runtime::spawn_blocking(find_transkun).await {
+        Ok(Some(command)) => TranskunStatus {
             available: true,
             command: Some(command.label()),
             detail: "TransKun 已就绪，可以开始转换。".to_string(),
         },
-        None => TranskunStatus {
+        Ok(None) => TranskunStatus {
             available: false,
             command: None,
             detail: "未找到 TransKun。请先在本机 Python 环境中安装并确保命令可用。".to_string(),
+        },
+        Err(error) => TranskunStatus {
+            available: false,
+            command: None,
+            detail: format!("检测 TransKun 时发生错误：{error}"),
         },
     }
 }

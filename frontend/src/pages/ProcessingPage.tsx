@@ -42,6 +42,8 @@ export function ProcessingPage() {
     queryKey: ['transkun-status'],
     queryFn: transcriptionApi.checkTranskun,
     retry: false,
+    staleTime: Infinity,
+    gcTime: Infinity,
   })
   const task = useQuery({
     queryKey: ['transcription-task'],
@@ -133,6 +135,10 @@ export function ProcessingPage() {
   const progress = progressFromLogs(task.data?.logs ?? [])
   const statusDetail = transkun.data?.detail
     ?? (transkun.error instanceof Error ? transkun.error.message : '正在确认本地 Python 环境。')
+
+  if (transkun.isPending || task.isPending) {
+    return <ProcessingPageLoading />
+  }
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background text-foreground/90">
@@ -337,6 +343,53 @@ export function ProcessingPage() {
           </ol>
           <div className="border-t border-border px-6 py-5 text-[10px] leading-5 tracking-wide text-muted-foreground">
             转写耗时取决于音频时长与电脑性能。处理期间可以切换页面，任务会在后台继续运行。
+          </div>
+        </aside>
+      </div>
+    </div>
+  )
+}
+
+function ProcessingPageLoading() {
+  return (
+    <div
+      className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background text-foreground/90"
+      role="status"
+      aria-live="polite"
+      aria-label="正在准备音频工作台"
+    >
+      <header className="flex min-h-24 shrink-0 items-center border-b border-border px-8 py-5 max-[720px]:min-h-20 max-[720px]:px-5">
+        <div>
+          <div className="flex items-center gap-3 text-[9px] font-bold tracking-[0.35em] text-muted-foreground">
+            <span className="h-px w-6 bg-border" />
+            音频工作台
+          </div>
+          <h1 className="mt-2 font-title text-2xl font-bold text-foreground/95">音频加工</h1>
+        </div>
+      </header>
+
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_19rem] max-[920px]:grid-cols-1">
+        <main className="grid min-h-0 place-items-center px-8 max-[720px]:px-5">
+          <div className="flex items-center gap-4 border border-border px-6 py-5">
+            <LoaderCircle className="size-5 shrink-0 animate-spin text-primary" />
+            <div>
+              <p className="text-sm font-bold text-foreground/90">正在准备音频工作台</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">检测 TransKun 并恢复转换任务</p>
+            </div>
+          </div>
+        </main>
+        <aside className="border-l border-border max-[920px]:hidden" aria-hidden="true">
+          <div className="border-b border-border px-6 py-5">
+            <span className="block h-2 w-20 animate-pulse bg-muted" />
+            <span className="mt-3 block h-2 w-32 animate-pulse bg-muted" />
+          </div>
+          <div className="space-y-5 px-6 py-7">
+            {workflow.map((label) => (
+              <div key={label} className="flex items-center gap-4">
+                <span className="size-6 animate-pulse border border-border" />
+                <span className="h-2 w-28 animate-pulse bg-muted" />
+              </div>
+            ))}
           </div>
         </aside>
       </div>
