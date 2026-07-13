@@ -112,14 +112,17 @@ export function FallingNotes({ score }: FallingNotesProps) {
     practiceEngineRef.current?.receiveNoteOn(pitch)
   }, [])
   const handleInputEvent = useEffectEvent((event: PianoInputEvent) => {
-    handlePianoInput(event, pianoKeyboardRef.current, handleUserNoteOn)
+    handlePianoInput(
+      event,
+      pianoKeyboardRef.current,
+      inputEnabled ? handleUserNoteOn : undefined,
+    )
   })
   const inputEnabled = mode === 'free' || (mode !== 'listen' && isPlaying)
   useComputerKeyboard(inputEnabled && activeInputDevice.kind === 'computer-keyboard')
   useEffect(() => {
-    if (!inputEnabled) return
     return pianoInputBus.subscribe(handleInputEvent)
-  }, [inputEnabled])
+  }, [])
   const beatsPerMeasure = useMemo(
     () => parseBeatsPerMeasure(score?.timeSignature ?? '4/4'),
     [score?.timeSignature],
@@ -375,17 +378,20 @@ export function FallingNotes({ score }: FallingNotesProps) {
 function handlePianoInput(
   event: PianoInputEvent,
   keyboard: PianoKeyboardHandle | null,
-  onNoteOn: (pitch: number) => void,
+  onNoteOn?: (pitch: number) => void,
 ) {
+  const sendInputEvents = event.sourceId === 'computer-keyboard-61'
+    ? sendComputerKeyboardEvents
+    : sendPhysicalMidiEvents
   if (event.type === 'noteOn') {
     keyboard?.applyKeyStates(new Map([[event.pitch, 'active']]))
-    onNoteOn(event.pitch)
-    sendMidiEvents([{ type: 'noteOn', channel: event.channel, note: event.pitch, velocity: event.velocity }])
+    onNoteOn?.(event.pitch)
+    sendInputEvents([{ type: 'noteOn', channel: event.channel, note: event.pitch, velocity: event.velocity }])
   } else if (event.type === 'noteOff') {
     keyboard?.applyKeyStates(new Map([[event.pitch, 'idle']]))
-    sendMidiEvents([{ type: 'noteOff', channel: event.channel, note: event.pitch, velocity: event.velocity }])
+    sendInputEvents([{ type: 'noteOff', channel: event.channel, note: event.pitch, velocity: event.velocity }])
   } else {
-    sendMidiEvents([{ type: 'controlChange', channel: event.channel, controller: event.controller, value: event.value }])
+    sendInputEvents([{ type: 'controlChange', channel: event.channel, controller: event.controller, value: event.value }])
   }
 }
 
@@ -496,6 +502,18 @@ function sendMidiEvents(events: MidiEvent[]) {
   if (events.length === 0) return
   void instrumentOutput.send(events).catch((error: unknown) => {
     console.error('Unable to send MIDI events', error)
+  })
+}
+
+function sendPhysicalMidiEvents(events: MidiEvent[]) {
+  void instrumentOutput.sendMidiInput(events).catch((error: unknown) => {
+    console.error('Unable to send physical MIDI events', error)
+  })
+}
+
+function sendComputerKeyboardEvents(events: MidiEvent[]) {
+  void instrumentOutput.sendComputerInput(events).catch((error: unknown) => {
+    console.error('Unable to send computer keyboard events', error)
   })
 }
 

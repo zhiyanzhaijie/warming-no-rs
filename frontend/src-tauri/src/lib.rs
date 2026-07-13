@@ -42,6 +42,8 @@ pub fn run() {
             transcription::generate_midi,
             audio_output::audio_output_status,
             audio_output::audio_send_events,
+            audio_output::audio_send_input_events,
+            audio_output::audio_send_computer_input_events,
             audio_output::audio_stop_all,
             midi_input::midi_list_inputs,
             midi_input::midi_connect_input,

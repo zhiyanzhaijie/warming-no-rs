@@ -46,32 +46,60 @@ pub struct AudioOutputStatus {
 
 pub struct AudioOutput {
     sender: Option<Sender<MidiEvent>>,
+    computer_sender: Option<Sender<MidiEvent>>,
+    input_sender: Option<Sender<MidiEvent>>,
     detail: String,
 }
 
 impl AudioOutput {
     pub fn start(soundfont_path: PathBuf) -> Self {
         let (event_tx, event_rx) = mpsc::channel();
+        let (computer_event_tx, computer_event_rx) = mpsc::channel();
+        let (input_event_tx, input_event_rx) = mpsc::channel();
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         thread::Builder::new()
             .name("soundfont-audio".to_string())
-            .spawn(move || run_audio_thread(&soundfont_path, event_rx, ready_tx))
+            .spawn(move || run_audio_thread(&soundfont_path, event_rx, computer_event_rx, input_event_rx, ready_tx))
             .ok();
 
         match ready_rx.recv_timeout(Duration::from_secs(15)) {
             Ok(Ok(())) => Self {
                 sender: Some(event_tx),
+                computer_sender: Some(computer_event_tx),
+                input_sender: Some(input_event_tx),
                 detail: "默认钢琴 SoundFont 已加载。".to_string(),
             },
             Ok(Err(error)) => Self {
                 sender: None,
+                computer_sender: None,
+                input_sender: None,
                 detail: error,
             },
             Err(_) => Self {
                 sender: None,
+                computer_sender: None,
+                input_sender: None,
                 detail: "音频引擎初始化超时。".to_string(),
             },
         }
+    }
+
+    fn send_input(&self, events: Vec<MidiEvent>) -> Result<(), String> {
+        let sender = self.input_sender.as_ref().ok_or_else(|| self.detail.clone())?;
+        for event in events {
+            validate_event(&event)?;
+            sender.send(event).map_err(|_| "音频线程已停止。".to_string())?;
+        }
+        Ok(())
+    }
+
+    fn send_computer_input(&self, events: Vec<MidiEvent>) -> Result<(), String> {
+        let sender = self.computer_sender.as_ref().ok_or_else(|| self.detail.clone())?;
+        for event in events {
+            validate_event(&event)?;
+            sender.send(event).map_err(|_| "音频线程已停止。".to_string())?;
+        }
+        Ok(())
     }
 
     fn send(&self, events: Vec<MidiEvent>) -> Result<(), String> {
@@ -99,7 +127,9 @@ impl AudioOutput {
                 value: 0,
             });
         }
-        self.send(events)
+        self.send(events.clone())?;
+        self.send_computer_input(events.clone())?;
+        self.send_input(events)
     }
 
     fn status(&self) -> AudioOutputStatus {
@@ -133,9 +163,11 @@ fn validate_event(event: &MidiEvent) -> Result<(), String> {
 fn run_audio_thread(
     soundfont_path: &Path,
     event_rx: Receiver<MidiEvent>,
+    computer_event_rx: Receiver<MidiEvent>,
+    input_event_rx: Receiver<MidiEvent>,
     ready_tx: mpsc::SyncSender<Result<(), String>>,
 ) {
-    match create_stream(soundfont_path, event_rx) {
+    match create_stream(soundfont_path, event_rx, computer_event_rx, input_event_rx) {
         Ok(stream) => {
             if let Err(error) = stream.play() {
                 let _ = ready_tx.send(Err(format!("无法启动音频输出：{error}")));
@@ -155,6 +187,8 @@ fn run_audio_thread(
 fn create_stream(
     soundfont_path: &Path,
     event_rx: Receiver<MidiEvent>,
+    computer_event_rx: Receiver<MidiEvent>,
+    input_event_rx: Receiver<MidiEvent>,
 ) -> Result<cpal::Stream, String> {
     let host = cpal::default_host();
     let device = host
@@ -167,16 +201,16 @@ fn create_stream(
     let config: cpal::StreamConfig = supported.into();
 
     match sample_format {
-        cpal::SampleFormat::I8 => build_stream::<i8>(&device, &config, soundfont_path, event_rx),
-        cpal::SampleFormat::I16 => build_stream::<i16>(&device, &config, soundfont_path, event_rx),
-        cpal::SampleFormat::I32 => build_stream::<i32>(&device, &config, soundfont_path, event_rx),
-        cpal::SampleFormat::I64 => build_stream::<i64>(&device, &config, soundfont_path, event_rx),
-        cpal::SampleFormat::U8 => build_stream::<u8>(&device, &config, soundfont_path, event_rx),
-        cpal::SampleFormat::U16 => build_stream::<u16>(&device, &config, soundfont_path, event_rx),
-        cpal::SampleFormat::U32 => build_stream::<u32>(&device, &config, soundfont_path, event_rx),
-        cpal::SampleFormat::U64 => build_stream::<u64>(&device, &config, soundfont_path, event_rx),
-        cpal::SampleFormat::F32 => build_stream::<f32>(&device, &config, soundfont_path, event_rx),
-        cpal::SampleFormat::F64 => build_stream::<f64>(&device, &config, soundfont_path, event_rx),
+        cpal::SampleFormat::I8 => build_stream::<i8>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
+        cpal::SampleFormat::I16 => build_stream::<i16>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
+        cpal::SampleFormat::I32 => build_stream::<i32>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
+        cpal::SampleFormat::I64 => build_stream::<i64>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
+        cpal::SampleFormat::U8 => build_stream::<u8>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
+        cpal::SampleFormat::U16 => build_stream::<u16>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
+        cpal::SampleFormat::U32 => build_stream::<u32>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
+        cpal::SampleFormat::U64 => build_stream::<u64>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
+        cpal::SampleFormat::F32 => build_stream::<f32>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
+        cpal::SampleFormat::F64 => build_stream::<f64>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
         format => Err(format!("暂不支持音频采样格式：{format}")),
     }
 }
@@ -186,13 +220,15 @@ fn build_stream<T>(
     config: &cpal::StreamConfig,
     soundfont_path: &Path,
     event_rx: Receiver<MidiEvent>,
+    computer_event_rx: Receiver<MidiEvent>,
+    input_event_rx: Receiver<MidiEvent>,
 ) -> Result<cpal::Stream, String>
 where
     T: cpal::SizedSample + cpal::FromSample<f32>,
 {
     let mut synth = oxisynth::Synth::new(oxisynth::SynthDescriptor {
         sample_rate: config.sample_rate as f32,
-        gain: 0.2,
+        gain: 0.5,
         ..Default::default()
     })
     .map_err(|error| format!("无法创建 SoundFont 合成器：{error}"))?;
@@ -201,6 +237,18 @@ where
     let font = oxisynth::SoundFont::load(&mut file)
         .map_err(|error| format!("无法解析默认 SoundFont：{error}"))?;
     synth.add_font(font, true);
+    let mut computer_synth = create_synth(soundfont_path, config.sample_rate as f32, 0.33)?;
+    let mut input_synth = oxisynth::Synth::new(oxisynth::SynthDescriptor {
+        sample_rate: config.sample_rate as f32,
+        gain: 0.67,
+        ..Default::default()
+    })
+    .map_err(|error| format!("无法创建 MIDI 输入合成器：{error}"))?;
+    let mut input_file =
+        File::open(soundfont_path).map_err(|error| format!("无法打开默认 SoundFont：{error}"))?;
+    let input_font = oxisynth::SoundFont::load(&mut input_file)
+        .map_err(|error| format!("无法解析默认 SoundFont：{error}"))?;
+    input_synth.add_font(input_font, true);
 
     let channels = config.channels as usize;
     device
@@ -210,8 +258,18 @@ where
                 for event in event_rx.try_iter() {
                     let _ = synth.send_event(to_synth_event(event));
                 }
+                for event in computer_event_rx.try_iter() {
+                    let _ = computer_synth.send_event(to_synth_event(event));
+                }
+                for event in input_event_rx.try_iter() {
+                    let _ = input_synth.send_event(to_synth_event(event));
+                }
                 for frame in output.chunks_mut(channels) {
                     let (left, right) = synth.read_next();
+                    let (computer_left, computer_right) = computer_synth.read_next();
+                    let (input_left, input_right) = input_synth.read_next();
+                    let left = left + computer_left + input_left;
+                    let right = right + computer_right + input_right;
                     for (index, sample) in frame.iter_mut().enumerate() {
                         *sample = T::from_sample(if index % 2 == 0 { left } else { right });
                     }
@@ -221,6 +279,25 @@ where
             None,
         )
         .map_err(|error| format!("无法创建音频输出流：{error}"))
+}
+
+fn create_synth(
+    soundfont_path: &Path,
+    sample_rate: f32,
+    gain: f32,
+) -> Result<oxisynth::Synth, String> {
+    let mut synth = oxisynth::Synth::new(oxisynth::SynthDescriptor {
+        sample_rate,
+        gain,
+        ..Default::default()
+    })
+    .map_err(|error| format!("无法创建 SoundFont 合成器：{error}"))?;
+    let mut file = File::open(soundfont_path)
+        .map_err(|error| format!("无法打开默认 SoundFont：{error}"))?;
+    let font = oxisynth::SoundFont::load(&mut file)
+        .map_err(|error| format!("无法解析默认 SoundFont：{error}"))?;
+    synth.add_font(font, true);
+    Ok(synth)
 }
 
 fn to_synth_event(event: MidiEvent) -> oxisynth::MidiEvent {
@@ -272,6 +349,22 @@ pub fn audio_send_events(
     events: Vec<MidiEvent>,
 ) -> Result<(), String> {
     output.send(events)
+}
+
+#[tauri::command]
+pub fn audio_send_input_events(
+    output: tauri::State<'_, AudioOutput>,
+    events: Vec<MidiEvent>,
+) -> Result<(), String> {
+    output.send_input(events)
+}
+
+#[tauri::command]
+pub fn audio_send_computer_input_events(
+    output: tauri::State<'_, AudioOutput>,
+    events: Vec<MidiEvent>,
+) -> Result<(), String> {
+    output.send_computer_input(events)
 }
 
 #[tauri::command]

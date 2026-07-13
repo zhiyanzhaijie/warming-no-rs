@@ -25,5 +25,9 @@ export const instrumentOutput = {
   status: () => invokeDesktop<AudioOutputStatus>('audio_output_status'),
   send: (events: MidiEvent[]) =>
     events.length === 0 ? Promise.resolve(undefined) : invokeDesktop<void>('audio_send_events', { events }),
+  sendComputerInput: (events: MidiEvent[]) =>
+    events.length === 0 ? Promise.resolve(undefined) : invokeDesktop<void>('audio_send_computer_input_events', { events }),
+  sendMidiInput: (events: MidiEvent[]) =>
+    events.length === 0 ? Promise.resolve(undefined) : invokeDesktop<void>('audio_send_input_events', { events }),
   stopAll: () => invokeDesktop<void>('audio_stop_all'),
 }

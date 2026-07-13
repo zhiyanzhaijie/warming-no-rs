@@ -10,7 +10,7 @@ pub struct MidiInputDevice {
 }
 
 #[derive(Clone, Debug, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 enum MidiInputEvent {
     NoteOn {
         source_id: String,
@@ -133,5 +133,20 @@ fn parse_message(source_id: &str, message: &[u8]) -> Option<MidiInputEvent> {
             value,
         }),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn input_event_uses_frontend_field_names() {
+        let event = parse_message("midi:0:keyboard", &[0x90, 60, 100]).unwrap();
+        let json = serde_json::to_value(event).unwrap();
+
+        assert_eq!(json["type"], "noteOn");
+        assert_eq!(json["sourceId"], "midi:0:keyboard");
+        assert!(json.get("source_id").is_none());
     }
 }

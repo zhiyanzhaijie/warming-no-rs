@@ -17,7 +17,6 @@ import { FallingNotes } from '../features/performance/FallingNotes'
 import { MeasureProgress } from '../features/practice/MeasureProgress'
 import { TransportControls } from '../features/practice/TransportControls'
 import { usePracticeStore } from '../features/practice/practiceStore'
-import { InputDeviceControl } from '../features/instrument/input/InputDeviceControl'
 import type { PracticeMode, ScoreNote } from '../shared/types/domain'
 
 export function PracticePage() {
@@ -69,7 +68,6 @@ export function PracticePage() {
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
-          <InputDeviceControl />
           <TransportControls compact availableModes={availableModes} />
           <Sheet>
             <SheetTrigger asChild>
