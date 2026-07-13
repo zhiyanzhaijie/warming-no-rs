@@ -40,7 +40,7 @@ export const PianoKeyboard = memo(function PianoKeyboard({
 
   return (
     <div
-      className="relative isolate w-full shrink-0 overflow-hidden border-t border-white/10 bg-[#080808] [contain:paint]"
+      className="relative isolate w-full shrink-0 overflow-hidden border-t border-border bg-card [contain:paint]"
       style={{
         aspectRatio: `${whiteKeys.length} / ${visibleWhiteKeyLengthRatio}`,
         width: `${width}px`,

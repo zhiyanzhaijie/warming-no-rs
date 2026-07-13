@@ -61,15 +61,15 @@ export function PracticePage() {
   }, [availableModes, mode, setMode])
 
   return (
-    <div className="immersive-dark relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#030303] text-foreground">
-      <header className="relative z-30 shrink-0 border-b border-white/10 bg-[#030303]/95 backdrop-blur-md">
+    <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background text-foreground">
+      <header className="relative z-30 shrink-0 border-b border-border bg-background/95 backdrop-blur-md">
         {consoleExpanded ? (
         <div className="relative flex min-h-16 items-center px-5 lg:px-8">
           <div className="min-w-0 max-w-[24%]">
-            <p className="text-[9px] font-bold uppercase tracking-[0.35em] text-white/25">
+            <p className="text-[9px] font-bold uppercase tracking-[0.35em] text-muted-foreground">
               练习演奏
             </p>
-            <h1 className="mt-1 truncate font-title text-lg font-bold tracking-tight text-white/90">
+            <h1 className="mt-1 truncate font-title text-lg font-bold tracking-tight text-foreground/90">
               {score?.title ?? '下落音符练习'}
             </h1>
           </div>
@@ -86,18 +86,18 @@ export function PracticePage() {
               <SheetTrigger asChild>
                 <button
                   type="button"
-                  className="grid size-8 place-items-center border border-white/10 text-white/40 transition hover:border-white/40 hover:text-white"
+                  className="grid size-8 place-items-center border border-border text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
                   aria-label="打开智能助手"
                   title="打开智能助手"
                 >
                   <Bot className="size-3.5" />
                 </button>
               </SheetTrigger>
-              <SheetContent className="border-l border-white/10 bg-[#080808]/95 p-0 text-foreground backdrop-blur-xl sm:max-w-md">
-                <SheetHeader className="border-b border-white/10 px-6 py-5">
-                  <p className="text-[9px] font-bold tracking-[0.3em] text-white/25">练习助手</p>
-                  <SheetTitle className="font-title text-base text-white/90">演奏分析</SheetTitle>
-                  <SheetDescription className="text-xs text-white/40">练习辅助与音准节拍诊断</SheetDescription>
+              <SheetContent className="border-l border-border bg-background/95 p-0 text-foreground backdrop-blur-xl sm:max-w-md">
+                <SheetHeader className="border-b border-border px-6 py-5">
+                  <p className="text-[9px] font-bold tracking-[0.3em] text-muted-foreground">练习助手</p>
+                  <SheetTitle className="font-title text-base text-foreground/90">演奏分析</SheetTitle>
+                  <SheetDescription className="text-xs text-muted-foreground">练习辅助与音准节拍诊断</SheetDescription>
                 </SheetHeader>
                 <div className="min-h-0 flex-1 overflow-y-auto p-6">
                   <AgentPanel />
@@ -109,7 +109,7 @@ export function PracticePage() {
         ) : null}
 
         {consoleExpanded ? (
-          <div className="hidden border-t border-white/[0.06] px-5 py-3 max-[860px]:block">
+          <div className="hidden border-t border-border px-5 py-3 max-[860px]:block">
             <TransportControls compact availableModes={availableModes} />
           </div>
         ) : null}

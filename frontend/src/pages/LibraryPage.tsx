@@ -97,18 +97,18 @@ export function LibraryPage() {
   }
 
   return (
-    <div className="immersive-dark relative flex h-full w-full overflow-hidden bg-background font-sans text-foreground/90">
+    <div className="relative flex h-full w-full overflow-hidden bg-background font-sans text-foreground/90">
       {/* Background Video */}
       <video
         autoPlay
         loop
         muted
         playsInline
-        className="absolute inset-0 size-full object-cover opacity-20 mix-blend-screen pointer-events-none"
+        className="pointer-events-none absolute inset-0 size-full object-cover opacity-[0.08] mix-blend-multiply dark:opacity-20 dark:mix-blend-screen"
         src="/ascii-flower.mp4"
       />
       {/* Elegant organic ambient radial-gradient masking */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/45 to-transparent pointer-events-none" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent dark:via-background/45" />
 
       {/* Main Structural Division */}
       <div className="relative z-10 flex size-full justify-between pl-14 pr-14 xl:pl-20 xl:pr-20">
@@ -223,13 +223,13 @@ export function LibraryPage() {
               </div>
             ) : (
               <div className="flex h-full min-h-[300px] flex-col items-center justify-center text-center opacity-60">
-                <div className="mb-6 p-4 rounded-full border border-white/5 bg-white/5">
-                  <Library className="size-6 text-white/20" />
+                <div className="mb-6 rounded-full border border-border bg-foreground/[0.03] p-4">
+                  <Library className="size-6 text-muted-foreground" />
                 </div>
-                <h3 className="font-title text-base tracking-[0.2em] text-white/50">
+                <h3 className="font-title text-base tracking-[0.2em] text-foreground/60">
                   曲库空白
                 </h3>
-                <p className="mt-3 max-w-[200px] text-[10px] leading-relaxed tracking-widest text-white/30">
+                <p className="mt-3 max-w-[200px] text-[10px] leading-relaxed tracking-widest text-muted-foreground">
                   从左侧琴房控制台<br />建立本地文件夹连接
                 </p>
               </div>

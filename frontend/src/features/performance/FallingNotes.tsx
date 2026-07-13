@@ -336,12 +336,12 @@ export function FallingNotes({ score }: FallingNotesProps) {
   }, [pixelsPerBeat, preparedNotes.length, renderStartBeat, score?.pieceId])
 
   return (
-    <section className="relative flex h-full min-h-0 flex-col bg-[#030303]">
+    <section className="relative flex h-full min-h-0 flex-col bg-background">
       <div
         ref={noteViewportRef}
-        className="relative min-h-0 flex-1 overflow-hidden bg-[#030303] [contain:paint] [isolation:isolate]"
+        className="relative min-h-0 flex-1 overflow-hidden bg-background [contain:paint] [isolation:isolate]"
       >
-        <div className="absolute left-5 top-4 z-20 border-l border-white/20 pl-3 text-[9px] font-bold uppercase tracking-[0.22em] text-white/30 lg:left-8">
+        <div className="absolute left-5 top-4 z-20 border-l border-border pl-3 text-[9px] font-bold uppercase tracking-[0.22em] text-muted-foreground lg:left-8">
           {score ? (
             <>
               时间轴 · <span ref={beatLabelRef}>0 / {Math.ceil(score.totalBeats)} 拍</span>
@@ -357,7 +357,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
           {octaveGuides.map((guide) => (
             <div
               key={`octave-${guide.pitch}`}
-              className="absolute inset-y-0 z-0 w-px bg-white/10"
+              className="absolute inset-y-0 z-0 w-px bg-border"
               style={{ left: `${guide.leftPx}px` }}
             />
           ))}
@@ -365,7 +365,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
           {innerPitchGuides.map((guide) => (
             <div
               key={`inner-${guide.pitch}`}
-              className="absolute inset-y-0 z-0 w-px bg-white/8"
+              className="absolute inset-y-0 z-0 w-px bg-border/60"
               style={{ left: `${guide.leftPx}px` }}
             />
           ))}
@@ -380,10 +380,10 @@ export function FallingNotes({ score }: FallingNotesProps) {
             {measureGuides.map((measure) => (
               <div
                 key={measure.number}
-                className="absolute inset-x-0 z-0 h-px bg-white/8"
+                className="absolute inset-x-0 z-0 h-px bg-border/60"
                 style={{ bottom: `${(measure.startBeat - renderStartBeat) * pixelsPerBeat}px` }}
               >
-                <span className="absolute bottom-1 left-1 text-[9px] font-bold tracking-[1px] text-white/30">
+                <span className="absolute bottom-1 left-1 text-[9px] font-bold tracking-[1px] text-muted-foreground">
                   {measure.number}
                 </span>
               </div>

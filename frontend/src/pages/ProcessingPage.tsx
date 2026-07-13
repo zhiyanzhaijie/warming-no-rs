@@ -135,16 +135,16 @@ export function ProcessingPage() {
     ?? (transkun.error instanceof Error ? transkun.error.message : '正在确认本地 Python 环境。')
 
   return (
-    <div className="immersive-dark flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#030303] text-white/90">
-      <header className="flex min-h-24 shrink-0 items-center justify-between gap-6 border-b border-white/10 px-8 py-5 max-[720px]:min-h-20 max-[720px]:px-5">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background text-foreground/90">
+      <header className="flex min-h-24 shrink-0 items-center justify-between gap-6 border-b border-border px-8 py-5 max-[720px]:min-h-20 max-[720px]:px-5">
         <div className="min-w-0">
-          <div className="flex items-center gap-3 text-[9px] font-bold tracking-[0.35em] text-white/25">
-            <span className="h-px w-6 bg-white/15" />
+          <div className="flex items-center gap-3 text-[9px] font-bold tracking-[0.35em] text-muted-foreground">
+            <span className="h-px w-6 bg-border" />
             音频工作台
           </div>
           <div className="mt-2 flex min-w-0 items-baseline gap-4">
-            <h1 className="shrink-0 font-title text-2xl font-bold text-white/95">音频加工</h1>
-            <p className="truncate text-xs tracking-wide text-white/35 max-[640px]:hidden">
+            <h1 className="shrink-0 font-title text-2xl font-bold text-foreground/95">音频加工</h1>
+            <p className="truncate text-xs tracking-wide text-muted-foreground max-[640px]:hidden">
               将钢琴录音转写为可用于练习的 MIDI 文件
             </p>
           </div>
@@ -153,7 +153,7 @@ export function ProcessingPage() {
           type="button"
           onClick={() => void transkun.refetch()}
           disabled={transkun.isFetching || isRunning}
-          className="grid size-9 shrink-0 place-items-center border border-white/10 text-white/40 transition hover:border-white/35 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-30"
+          className="grid size-9 shrink-0 place-items-center border border-border text-muted-foreground transition hover:border-foreground/35 hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="重新检测转换引擎"
           title="重新检测转换引擎"
         >
@@ -163,11 +163,11 @@ export function ProcessingPage() {
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_19rem] max-[920px]:grid-cols-1 max-[920px]:overflow-y-auto">
         <main className="flex min-h-0 min-w-0 flex-col max-[920px]:min-h-[620px]">
-          <section className="flex shrink-0 items-start gap-4 border-b border-white/10 px-8 py-5 max-[720px]:px-5">
+          <section className="flex shrink-0 items-start gap-4 border-b border-border px-8 py-5 max-[720px]:px-5">
             <div
               className={cn(
-                'grid size-9 shrink-0 place-items-center border text-white/35',
-                ready ? 'border-primary/50 text-primary' : 'border-white/10',
+                'grid size-9 shrink-0 place-items-center border text-muted-foreground',
+                ready ? 'border-primary/50 text-primary' : 'border-border',
               )}
             >
               {transkun.isFetching ? (
@@ -180,7 +180,7 @@ export function ProcessingPage() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                <h2 className="text-sm font-bold text-white/90">
+                <h2 className="text-sm font-bold text-foreground/90">
                   {transkun.isFetching
                     ? '正在检测 TransKun'
                     : ready
@@ -189,14 +189,14 @@ export function ProcessingPage() {
                 </h2>
                 <span className={cn(
                   'text-[9px] font-bold tracking-[0.22em]',
-                  ready ? 'text-primary' : 'text-white/25',
+                  ready ? 'text-primary' : 'text-muted-foreground',
                 )}>
                   {ready ? '本地可用' : '等待检测'}
                 </span>
               </div>
-              <p className="mt-1 text-xs leading-5 text-white/35">{statusDetail}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{statusDetail}</p>
               {transkun.data?.command ? (
-                <code className="mt-2 block truncate text-[10px] tracking-wide text-white/25">
+                <code className="mt-2 block truncate text-[10px] tracking-wide text-muted-foreground">
                   {transkun.data.command}
                 </code>
               ) : null}
@@ -207,37 +207,37 @@ export function ProcessingPage() {
             type="button"
             disabled={!ready || selectFile.isPending || isRunning}
             onClick={() => selectFile.mutate()}
-            className="group relative flex min-h-64 flex-1 items-center justify-center overflow-hidden border-b border-white/10 px-8 py-10 text-left transition hover:bg-white/[0.025] disabled:cursor-not-allowed disabled:opacity-40 max-[720px]:px-5"
+            className="group relative flex min-h-64 flex-1 items-center justify-center overflow-hidden border-b border-border px-8 py-10 text-left transition hover:bg-foreground/[0.025] disabled:cursor-not-allowed disabled:opacity-40 max-[720px]:px-5"
           >
-            <span className="pointer-events-none absolute inset-x-8 top-1/2 h-px bg-white/[0.04] max-[720px]:inset-x-5" />
-            <span className="pointer-events-none absolute inset-y-8 left-1/2 w-px bg-white/[0.04]" />
-            <div className="relative z-10 flex w-full max-w-2xl items-center gap-6 border border-white/10 bg-[#030303] px-6 py-7 transition group-hover:border-white/30 max-[600px]:items-start max-[600px]:gap-4 max-[600px]:px-4">
-              <div className="grid size-12 shrink-0 place-items-center border border-white/15 text-white/45 transition group-hover:border-primary/60 group-hover:text-primary">
+            <span className="pointer-events-none absolute inset-x-8 top-1/2 h-px bg-border max-[720px]:inset-x-5" />
+            <span className="pointer-events-none absolute inset-y-8 left-1/2 w-px bg-border" />
+            <div className="relative z-10 flex w-full max-w-2xl items-center gap-6 border border-border bg-background px-6 py-7 transition group-hover:border-foreground/30 max-[600px]:items-start max-[600px]:gap-4 max-[600px]:px-4">
+              <div className="grid size-12 shrink-0 place-items-center border border-border text-muted-foreground transition group-hover:border-primary/60 group-hover:text-primary">
                 {selectFile.isPending ? <LoaderCircle className="size-5 animate-spin" /> : file ? <FileAudio className="size-5" /> : <Upload className="size-5" />}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold tracking-[0.3em] text-white/25">
+                <p className="text-[9px] font-bold tracking-[0.3em] text-muted-foreground">
                   {file ? '当前音频' : '输入文件'}
                 </p>
-                <p className="mt-2 truncate font-title text-lg font-bold text-white/90" title={file?.name}>
+                <p className="mt-2 truncate font-title text-lg font-bold text-foreground/90" title={file?.name}>
                   {file?.name ?? '选择钢琴音频'}
                 </p>
                 {file ? (
                   <>
-                    <p className="mt-1 text-xs tracking-wide text-white/40">
+                    <p className="mt-1 text-xs tracking-wide text-muted-foreground">
                       {formatBytes(file.sizeBytes)} · {(file.name.split('.').pop() ?? '音频').toUpperCase()}
                     </p>
-                    <p className="mt-3 truncate text-[10px] tracking-wide text-white/25" title={file.path}>
+                    <p className="mt-3 truncate text-[10px] tracking-wide text-muted-foreground" title={file.path}>
                       {file.path}
                     </p>
                   </>
                 ) : (
-                  <p className="mt-2 text-xs leading-5 text-white/35">
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
                     支持 MP3、FLAC、WAV、M4A、AAC、OGG 与 Opus
                   </p>
                 )}
               </div>
-              <span className="shrink-0 text-[9px] font-bold tracking-[0.2em] text-white/25 transition group-hover:text-white/70 max-[600px]:hidden">
+              <span className="shrink-0 text-[9px] font-bold tracking-[0.2em] text-muted-foreground transition group-hover:text-foreground/70 max-[600px]:hidden">
                 {file ? '更换文件' : '浏览文件'}
               </span>
             </div>
@@ -254,13 +254,13 @@ export function ProcessingPage() {
                   <FileMusic className="size-4 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-xs font-bold tracking-wide">MIDI 已生成</p>
-                    <p className="mt-1 truncate text-[10px] text-white/35" title={outputPath}>{outputPath}</p>
+                    <p className="mt-1 truncate text-[10px] text-muted-foreground" title={outputPath}>{outputPath}</p>
                   </div>
                 </div>
               ) : message ? (
                 <p className="text-xs font-bold text-destructive">{message}</p>
               ) : (
-                <div className="flex items-center gap-3 text-white/30">
+                <div className="flex items-center gap-3 text-muted-foreground">
                   <FolderOutput className="size-4 shrink-0" />
                   <p className="text-[10px] leading-5 tracking-wide">
                     生成时选择保存位置，源文件不会被修改
@@ -292,7 +292,7 @@ export function ProcessingPage() {
                 type="button"
                 disabled={!ready || !file || generate.isPending}
                 onClick={() => file && generate.mutate(file.path)}
-                className="h-10 min-w-56 border border-primary bg-primary px-5 text-[10px] font-bold tracking-[0.18em] text-black transition hover:bg-transparent hover:text-primary disabled:border-white/10 disabled:bg-transparent disabled:text-white/20 max-[720px]:w-full"
+                className="h-10 min-w-56 border border-primary bg-primary px-5 text-[10px] font-bold tracking-[0.18em] text-primary-foreground transition hover:bg-transparent hover:text-primary disabled:border-border disabled:bg-transparent disabled:text-muted-foreground max-[720px]:w-full"
               >
                 选择保存位置并生成 MIDI
               </button>
@@ -300,10 +300,10 @@ export function ProcessingPage() {
           </section>
         </main>
 
-        <aside className="flex min-h-0 flex-col border-l border-white/10 max-[920px]:border-l-0 max-[920px]:border-t">
-          <div className="border-b border-white/10 px-6 py-5">
-            <p className="text-[9px] font-bold tracking-[0.32em] text-white/25">处理流程</p>
-            <p className="mt-2 text-xs leading-5 text-white/35">所有转写均在本机完成</p>
+        <aside className="flex min-h-0 flex-col border-l border-border max-[920px]:border-l-0 max-[920px]:border-t">
+          <div className="border-b border-border px-6 py-5">
+            <p className="text-[9px] font-bold tracking-[0.32em] text-muted-foreground">处理流程</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">所有转写均在本机完成</p>
           </div>
           <ol className="flex-1 px-6 py-3">
             {workflow.map((label, index) => {
@@ -311,21 +311,21 @@ export function ProcessingPage() {
               const completed = currentStep >= step
               const active = currentStep + 1 === step
               return (
-                <li key={label} className="relative flex min-h-16 gap-4 border-b border-white/[0.07] py-4 last:border-b-0">
+                <li key={label} className="relative flex min-h-16 gap-4 border-b border-border py-4 last:border-b-0">
                   <span className={cn(
                     'grid size-6 shrink-0 place-items-center border text-[9px] font-bold',
                     completed
                       ? 'border-primary/60 text-primary'
                       : active
-                        ? 'border-white/35 text-white/75'
-                        : 'border-white/10 text-white/20',
+                        ? 'border-foreground/35 text-foreground/75'
+                        : 'border-border text-muted-foreground',
                   )}>
                     {completed ? <Check className="size-3" /> : step.toString().padStart(2, '0')}
                   </span>
                   <div className="pt-0.5">
                     <p className={cn(
                       'text-xs font-bold tracking-wide',
-                      completed ? 'text-white/65' : active ? 'text-white/90' : 'text-white/25',
+                      completed ? 'text-foreground/65' : active ? 'text-foreground/90' : 'text-muted-foreground',
                     )}>
                       {label}
                     </p>
@@ -335,7 +335,7 @@ export function ProcessingPage() {
               )
             })}
           </ol>
-          <div className="border-t border-white/10 px-6 py-5 text-[10px] leading-5 tracking-wide text-white/25">
+          <div className="border-t border-border px-6 py-5 text-[10px] leading-5 tracking-wide text-muted-foreground">
             转写耗时取决于音频时长与电脑性能。处理期间可以切换页面，任务会在后台继续运行。
           </div>
         </aside>
@@ -357,18 +357,18 @@ function TaskOutput({
   const latestLogs = task.logs.slice(-8)
 
   return (
-    <section className="shrink-0 border-b border-white/10 px-8 py-4 max-[720px]:px-5">
+    <section className="shrink-0 border-b border-border px-8 py-4 max-[720px]:px-5">
       <div className="flex items-center justify-between gap-4 text-[9px] font-bold tracking-[0.2em]">
         <span className={cn(
-          running ? 'text-primary' : task.status === 'failed' ? 'text-destructive' : 'text-white/55',
+          running ? 'text-primary' : task.status === 'failed' ? 'text-destructive' : 'text-foreground/55',
         )}>
           {task.status === 'cancelling' ? '正在停止 TRANSKUN' : running ? 'TRANSKUN 运行中' : task.status === 'succeeded' ? '转写完成' : '转写中断'}
         </span>
-        <span className="text-white/25">
+        <span className="text-muted-foreground">
           {progress === null ? formatDuration(elapsed) : `${progress}% · ${formatDuration(elapsed)}`}
         </span>
       </div>
-      <div className="relative mt-3 h-[3px] overflow-hidden bg-white/[0.06]">
+      <div className="relative mt-3 h-[3px] overflow-hidden bg-muted">
         {progress === null && running ? (
           <span className="absolute inset-y-0 w-1/3 animate-[workshop-progress_1.4s_ease-in-out_infinite] bg-primary" />
         ) : (
@@ -378,7 +378,7 @@ function TaskOutput({
           />
         )}
       </div>
-      <div className="mt-3 max-h-24 overflow-y-auto border-l border-white/10 pl-3 font-mono text-[10px] leading-5 text-white/30">
+      <div className="mt-3 max-h-24 overflow-y-auto border-l border-border pl-3 font-mono text-[10px] leading-5 text-muted-foreground">
         {latestLogs.length > 0
           ? latestLogs.map((line, index) => <p key={`${index}-${line}`}>{line}</p>)
           : <p>等待 TransKun 输出...</p>}

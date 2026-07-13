@@ -58,7 +58,7 @@ export function PieceCard({
           <span>PROGRESS</span>
           <span className="text-foreground/80">{Math.round(piece.progress * 100)}%</span>
         </div>
-        <div className="mt-1.5 h-[2px] overflow-hidden bg-muted/10">
+        <div className="mt-1.5 h-[2px] overflow-hidden bg-muted">
           <div
             className="h-full bg-foreground transition-all duration-500 ease-out group-hover:bg-primary"
             style={{ width: `${piece.progress * 100}%` }}
