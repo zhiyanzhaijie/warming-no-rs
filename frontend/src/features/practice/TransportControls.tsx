@@ -4,7 +4,7 @@ import { useRef, useState, type ReactNode } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Slider } from '@/components/ui/slider'
 import type { PracticeMode } from '../../shared/types/domain'
-import { usePracticeStore } from './practiceStore'
+import { usePracticeStore, type LoopRange } from './practiceStore'
 
 const modes: Array<{ value: PracticeMode; label: string; description: string; icon: LucideIcon }> = [
   { value: 'listen', label: '聆听', description: '完整自动演奏', icon: Ear },
@@ -14,19 +14,14 @@ const modes: Array<{ value: PracticeMode; label: string; description: string; ic
   { value: 'both-hands', label: '双手', description: '全部音符等待输入', icon: Users },
 ]
 
-export function PlaybackCluster() {
+export function PlaybackCluster({ defaultLoopRange }: { defaultLoopRange: LoopRange | null }) {
   const bpm = usePracticeStore((state) => state.bpm)
   const isPlaying = usePracticeStore((state) => state.isPlaying)
   const loopEnabled = usePracticeStore((state) => state.loopEnabled)
-  const loopRange = usePracticeStore((state) => state.loopRange)
-  const loopSelecting = usePracticeStore((state) => state.loopSelecting)
-  const loopSelectionAnchor = usePracticeStore((state) => state.loopSelectionAnchor)
   const mode = usePracticeStore((state) => state.mode)
   const setBpm = usePracticeStore((state) => state.setBpm)
   const togglePlayback = usePracticeStore((state) => state.togglePlayback)
   const toggleLoop = usePracticeStore((state) => state.toggleLoop)
-  const beginLoopSelection = usePracticeStore((state) => state.beginLoopSelection)
-  const clearLoop = usePracticeStore((state) => state.clearLoop)
   const timedMode = mode !== 'free'
 
   return (
@@ -52,28 +47,17 @@ export function PlaybackCluster() {
         {isPlaying ? <Pause className="size-4 fill-current" /> : <Play className="size-4 translate-x-px fill-current" />}
       </button>
 
-      <HoverPopover
-        trigger={
-          <button type="button" disabled={!timedMode} className={`grid size-9 place-items-center transition disabled:cursor-not-allowed disabled:opacity-20 ${loopEnabled || loopSelecting ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`} aria-label="循环设置">
-            <Repeat2 className="size-4" />
-          </button>
-        }
+      <button
+        type="button"
+        disabled={!timedMode || !defaultLoopRange}
+        onClick={() => defaultLoopRange && toggleLoop(defaultLoopRange)}
+        aria-pressed={loopEnabled}
+        aria-label={loopEnabled ? '关闭循环练习' : '开启循环练习'}
+        title={loopEnabled ? '关闭循环练习' : '开启循环练习'}
+        className={`grid size-9 place-items-center outline-none transition focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-20 ${loopEnabled ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
       >
-        <div className="w-56 p-3">
-          <div className="border-b border-border px-1 pb-3">
-            <p className="text-[9px] font-bold tracking-[0.24em] text-muted-foreground">循环练习</p>
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              {loopSelecting ? (loopSelectionAnchor ? '请在进度条选择结束小节' : '请在进度条选择起始小节') : loopRange ? `当前范围：第 ${loopRange.startMeasure}–${loopRange.endMeasure} 小节` : '选择一段小节反复练习'}
-            </p>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button type="button" onClick={loopSelecting ? clearLoop : loopRange ? toggleLoop : beginLoopSelection} className="h-8 flex-1 border border-border text-[10px] font-bold text-foreground/70 transition hover:bg-foreground hover:text-background">
-              {loopSelecting ? '取消选择' : loopRange ? (loopEnabled ? '暂停循环' : '启用循环') : '选择范围'}
-            </button>
-            {loopRange ? <button type="button" onClick={clearLoop} className="h-8 border border-border px-3 text-[10px] font-bold text-muted-foreground transition hover:text-foreground">清除</button> : null}
-          </div>
-        </div>
-      </HoverPopover>
+        <Repeat2 className="size-4" />
+      </button>
     </div>
   )
 }

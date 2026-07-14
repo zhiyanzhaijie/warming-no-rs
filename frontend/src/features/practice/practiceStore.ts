@@ -9,8 +9,6 @@ type PracticeState = {
   isPlaying: boolean
   loopEnabled: boolean
   loopRange: LoopRange | null
-  loopSelecting: boolean
-  loopSelectionAnchor: LoopMeasure | null
   mode: PracticeMode
   startSession: (piece: { id: string; title: string }) => void
   endSession: () => void
@@ -20,22 +18,14 @@ type PracticeState = {
   setMode: (mode: PracticeMode) => void
   togglePlayback: () => void
   pausePlayback: () => void
-  toggleLoop: () => void
-  beginLoopSelection: () => void
-  selectLoopMeasure: (measure: LoopMeasure) => void
-  clearLoop: () => void
+  toggleLoop: (defaultRange: LoopRange) => void
+  setLoopRange: (range: LoopRange) => void
 }
 
 export type PracticeSession = {
   pieceId: string
   pieceTitle: string
   currentBeat: number
-}
-
-export type LoopMeasure = {
-  number: number
-  startBeat: number
-  endBeat: number
 }
 
 export type LoopRange = {
@@ -53,8 +43,6 @@ export const usePracticeStore = create<PracticeState>((set) => ({
   isPlaying: false,
   loopEnabled: false,
   loopRange: null,
-  loopSelecting: false,
-  loopSelectionAnchor: null,
   mode: 'listen',
   startSession: (piece) =>
     set((state) => state.session?.pieceId === piece.id
@@ -65,8 +53,6 @@ export const usePracticeStore = create<PracticeState>((set) => ({
           isPlaying: false,
           loopEnabled: false,
           loopRange: null,
-          loopSelecting: false,
-          loopSelectionAnchor: null,
         }),
   endSession: () => set({
     session: null,
@@ -75,8 +61,6 @@ export const usePracticeStore = create<PracticeState>((set) => ({
     isPlaying: false,
     loopEnabled: false,
     loopRange: null,
-    loopSelecting: false,
-    loopSelectionAnchor: null,
   }),
   setBpm: (bpm) => set({ bpm }),
   setCurrentBeat: (currentBeat) => set((state) => ({
@@ -93,29 +77,10 @@ export const usePracticeStore = create<PracticeState>((set) => ({
       state.mode !== 'free' ? { isPlaying: !state.isPlaying } : state,
     ),
   pausePlayback: () => set({ isPlaying: false }),
-  toggleLoop: () =>
-    set((state) =>
-      state.loopRange
-        ? { loopEnabled: !state.loopEnabled, loopSelecting: false, loopSelectionAnchor: null }
-        : { loopEnabled: false, loopSelecting: true, loopSelectionAnchor: null },
-    ),
-  beginLoopSelection: () => set({ loopEnabled: false, loopRange: null, loopSelecting: true, loopSelectionAnchor: null }),
-  selectLoopMeasure: (measure) =>
-    set((state) => {
-      const anchor = state.loopSelectionAnchor
-      if (!state.loopSelecting) return {}
-      if (!anchor) return { loopSelectionAnchor: measure }
-      return {
-        loopSelectionAnchor: null,
-        loopSelecting: false,
-        loopEnabled: true,
-        loopRange: {
-          startBeat: Math.min(anchor.startBeat, measure.startBeat),
-          endBeat: Math.max(anchor.endBeat, measure.endBeat),
-          startMeasure: Math.min(anchor.number, measure.number),
-          endMeasure: Math.max(anchor.number, measure.number),
-        },
-      }
-    }),
-  clearLoop: () => set({ loopEnabled: false, loopRange: null, loopSelecting: false, loopSelectionAnchor: null }),
+  toggleLoop: (defaultRange) =>
+    set((state) => ({
+      loopEnabled: !state.loopEnabled,
+      loopRange: state.loopRange ?? defaultRange,
+    })),
+  setLoopRange: (loopRange) => set({ loopRange }),
 }))

@@ -19,6 +19,8 @@ import { MeasureProgress } from '../features/practice/MeasureProgress'
 import { PlaybackCluster, TransportControls } from '../features/practice/TransportControls'
 import { usePracticeStore } from '../features/practice/practiceStore'
 import { usePracticeShortcuts } from '../features/practice/usePracticeShortcuts'
+import { buildMeasureTimings } from '../features/practice/measureTiming'
+import type { LoopRange } from '../features/practice/practiceStore'
 import type { PracticeMode, ScoreNote } from '../shared/types/domain'
 
 export function PracticePage() {
@@ -52,6 +54,10 @@ export function PracticePage() {
   const availableModes = useMemo(
     () => buildAvailableModes(score?.notes ?? []),
     [score?.notes],
+  )
+  const defaultLoopRange = useMemo(
+    () => buildDefaultLoopRange(score?.totalBeats ?? 0, score?.timeSignature ?? '4/4'),
+    [score?.timeSignature, score?.totalBeats],
   )
   const exitPractice = useCallback(() => {
     void instrumentOutput.stopAll().catch((error: unknown) => {
@@ -103,7 +109,7 @@ export function PracticePage() {
           </div>
 
           <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-3 max-[860px]:hidden">
-            <PlaybackCluster />
+            <PlaybackCluster defaultLoopRange={defaultLoopRange} />
           </div>
 
           <div className="ml-auto flex min-w-0 items-center justify-end gap-2">
@@ -175,6 +181,17 @@ function FullscreenButton({ fullscreen, onToggle }: { fullscreen: boolean; onTog
       <Icon className="size-3.5" />
     </button>
   )
+}
+
+function buildDefaultLoopRange(totalBeats: number, timeSignature: string): LoopRange | null {
+  if (totalBeats <= 0) return null
+  const measures = buildMeasureTimings(totalBeats, timeSignature)
+  return {
+    startBeat: 0,
+    endBeat: totalBeats,
+    startMeasure: 1,
+    endMeasure: measures.at(-1)?.number ?? 1,
+  }
 }
 
 function buildAvailableModes(notes: ScoreNote[]) {
