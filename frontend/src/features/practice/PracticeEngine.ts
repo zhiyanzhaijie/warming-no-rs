@@ -8,7 +8,7 @@ export type PracticeTargetGroup = {
 export class PracticeEngine {
   private groups: PracticeTargetGroup[] = []
   private nextGroupIndex = 0
-  private waitingPitches: Set<number> | null = null
+  private waitingTarget: PracticeTargetGroup | null = null
 
   configure(notes: ScoreNote[], mode: PracticeMode) {
     this.groups = buildTargetGroups(selectUserNotes(notes, mode))
@@ -17,23 +17,24 @@ export class PracticeEngine {
 
   reset(beat: number) {
     this.nextGroupIndex = lowerBoundGroup(this.groups, beat)
-    this.waitingPitches = null
+    this.waitingTarget = null
   }
 
   advance(proposedBeat: number) {
     const target = this.groups[this.nextGroupIndex]
     if (!target) return { beat: proposedBeat, target: null }
-    if (this.waitingPitches) return { beat: target.beat, target }
+    if (this.waitingTarget) return { beat: target.beat, target: this.waitingTarget }
     if (proposedBeat < target.beat) return { beat: proposedBeat, target: null }
-    this.waitingPitches = new Set(target.pitches)
-    return { beat: target.beat, target }
+    this.waitingTarget = { beat: target.beat, pitches: new Set(target.pitches) }
+    return { beat: target.beat, target: this.waitingTarget }
   }
 
   receiveNoteOn(pitch: number) {
-    if (!this.waitingPitches?.delete(pitch)) return false
-    if (this.waitingPitches.size > 0) return false
-    this.waitingPitches = null
-    this.nextGroupIndex += 1
+    if (!this.waitingTarget?.pitches.delete(pitch)) return false
+    if (this.waitingTarget.pitches.size === 0) {
+      this.waitingTarget = null
+      this.nextGroupIndex += 1
+    }
     return true
   }
 }
@@ -45,7 +46,7 @@ export function selectAutoPlayNotes(notes: ScoreNote[], mode: PracticeMode) {
   return []
 }
 
-function selectUserNotes(notes: ScoreNote[], mode: PracticeMode) {
+export function selectUserNotes(notes: ScoreNote[], mode: PracticeMode) {
   if (mode === 'right-hand') return notes.filter((note) => note.hand === 'right')
   if (mode === 'left-hand') return notes.filter((note) => note.hand === 'left')
   if (mode === 'both-hands') return notes

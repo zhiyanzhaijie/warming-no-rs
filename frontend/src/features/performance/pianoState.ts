@@ -1,1 +1,1 @@
-export type PianoKeyState = 'idle' | 'active' | 'incorrect' | 'guided'
+export type PianoKeyState = 'idle' | 'valid' | 'invalid' | 'guided'

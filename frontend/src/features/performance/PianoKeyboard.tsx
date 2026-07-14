@@ -70,12 +70,15 @@ function applyChanges(
   currentStates: ReadonlyMap<number, PianoKeyState>,
   changes: ReadonlyMap<number, PianoKeyState>,
 ) {
-  const nextStates = new Map(currentStates)
+  let nextStates: Map<number, PianoKeyState> | null = null
   for (const [pitch, state] of changes) {
+    const currentState = currentStates.get(pitch) ?? 'idle'
+    if (currentState === state) continue
+    nextStates ??= new Map(currentStates)
     if (state === 'idle') nextStates.delete(pitch)
     else nextStates.set(pitch, state)
   }
-  return nextStates
+  return nextStates ?? currentStates
 }
 
 const PianoKey = memo(function PianoKey({
@@ -93,21 +96,21 @@ const PianoKey = memo(function PianoKey({
       className={cn(
         'absolute [contain:paint]',
         isBlack
-          ? 'top-0 z-10 bg-[#070707] shadow-[0_3px_6px_rgba(0,0,0,0.55),inset_0_-8px_12px_rgba(255,255,255,0.07)]'
-          : 'inset-y-0 border-r border-[#aaa] bg-[#f1f1f1] shadow-[inset_0_-8px_14px_rgba(0,0,0,0.14)] first:border-l',
-        state === 'active' && (isBlack ? 'bg-[#159447]' : 'bg-spotify-green'),
-        state === 'incorrect' && (isBlack ? 'bg-[#343434]' : 'bg-[#8f8f8f]'),
+          ? 'piano-key-black top-0 z-10'
+          : 'piano-key-white inset-y-0',
       )}
       style={{
         left: `${leftPx}px`,
         width: `${widthPx}px`,
         height: isBlack ? `${blackKeyLengthRatio * 100}%` : '100%',
+        backgroundColor: pianoKeyStateColor(state, isBlack)
+          ?? (isBlack ? 'var(--piano-key-black)' : 'var(--piano-key-white)'),
       }}
     >
       {state === 'guided' ? (
         <span
           className={cn(
-            'pointer-events-none absolute left-1/2 size-[clamp(4px,0.55vw,8px)] -translate-x-1/2 rounded-full bg-spotify-green',
+            'pointer-events-none absolute left-1/2 size-[clamp(4px,0.55vw,8px)] -translate-x-1/2 rounded-full bg-primary',
             label
               ? isBlack
                 ? 'bottom-[35%]'
@@ -122,8 +125,12 @@ const PianoKey = memo(function PianoKey({
         <span
           className={cn(
             'pointer-events-none absolute bottom-[8%] left-1/2 -translate-x-1/2 text-[clamp(7px,0.65vw,10px)] font-bold leading-none',
-            isBlack ? 'text-white/75' : 'text-black/55',
           )}
+          style={{
+            color: isBlack
+              ? 'var(--piano-key-black-label)'
+              : 'var(--piano-key-white-label)',
+          }}
         >
           {label}
         </span>
@@ -131,3 +138,17 @@ const PianoKey = memo(function PianoKey({
     </div>
   )
 })
+
+function pianoKeyStateColor(state: PianoKeyState, isBlack: boolean) {
+  if (state === 'valid') {
+    return isBlack
+      ? 'var(--piano-key-valid-black)'
+      : 'var(--piano-key-valid-white)'
+  }
+  if (state === 'invalid') {
+    return isBlack
+      ? 'var(--piano-key-invalid-black)'
+      : 'var(--piano-key-invalid-white)'
+  }
+  return undefined
+}

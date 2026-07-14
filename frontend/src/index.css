@@ -71,6 +71,19 @@
     --border: #d5c4a1;
     --input: #bdae93;
     --ring: #79740e;
+    --piano-key-white: #e9dfc5;
+    --piano-key-white-edge: #9c8d72;
+    --piano-key-white-front: #776a55;
+    --piano-key-white-label: #574f43;
+    --piano-key-black: #26221c;
+    --piano-key-black-edge: #625849;
+    --piano-key-black-front: #13110e;
+    --piano-key-black-label: #ded5c0;
+    --piano-key-invalid-lift: #81786b;
+    --piano-key-valid-white: color-mix(in srgb, var(--primary) 82%, var(--piano-key-white));
+    --piano-key-valid-black: color-mix(in srgb, var(--primary) 68%, var(--piano-key-black));
+    --piano-key-invalid-white: color-mix(in srgb, var(--piano-key-white) 62%, #000000);
+    --piano-key-invalid-black: color-mix(in srgb, var(--piano-key-black) 58%, var(--piano-key-invalid-lift));
     --radius: 0.5rem;
     --chart-3: #af3a03;
     --chart-4: #076678;
@@ -117,6 +130,15 @@
     --border: #272727;
     --input: #272727;
     --ring: #1ed760;
+    --piano-key-white: #d1c9b9;
+    --piano-key-white-edge: #777064;
+    --piano-key-white-front: #59534a;
+    --piano-key-white-label: #3f3b35;
+    --piano-key-black: #12130f;
+    --piano-key-black-edge: #414038;
+    --piano-key-black-front: #070805;
+    --piano-key-black-label: #c8c1b2;
+    --piano-key-invalid-lift: #696861;
     --chart-3: #ffa42b;
     --chart-4: #539df5;
     --spotify-green: #1ed760;
@@ -155,6 +177,15 @@
     --border: #272727;
     --input: #272727;
     --ring: #1ed760;
+    --piano-key-white: #c8c1b3;
+    --piano-key-white-edge: #686258;
+    --piano-key-white-front: #4b463f;
+    --piano-key-white-label: #38352f;
+    --piano-key-black: #0c0d0a;
+    --piano-key-black-edge: #35362f;
+    --piano-key-black-front: #050604;
+    --piano-key-black-label: #bbb5a8;
+    --piano-key-invalid-lift: #60615a;
     --spotify-green: #1ed760;
     --spotify-green-hover: #1fdf64;
   }
@@ -195,6 +226,42 @@
   a {
     color: inherit;
     text-decoration: none;
+  }
+}
+
+@layer components {
+  .piano-key-white {
+    border-left: clamp(1px, 0.1vw, 2px) solid var(--piano-key-white-edge);
+    border-right: clamp(1px, 0.1vw, 2px) solid var(--piano-key-white-edge);
+    border-bottom: clamp(3px, 0.28vw, 4px) solid var(--piano-key-white-front);
+    background-image: linear-gradient(
+      90deg,
+      rgb(0 0 0 / 0.09) 0%,
+      transparent 11%,
+      transparent 78%,
+      rgb(255 255 255 / 0.16) 100%
+    );
+    box-shadow:
+      inset 0 -7px 10px rgb(0 0 0 / 0.08),
+      0 1px 2px rgb(0 0 0 / 0.16);
+  }
+
+  .piano-key-black {
+    border-left: clamp(1px, 0.12vw, 2px) solid var(--piano-key-black-edge);
+    border-right: clamp(1px, 0.12vw, 2px) solid var(--piano-key-black-edge);
+    border-top: 1px solid color-mix(in srgb, var(--piano-key-black-edge) 72%, transparent);
+    border-bottom: clamp(3px, 0.32vw, 5px) solid var(--piano-key-black-front);
+    border-radius: 0 0 clamp(5px, 0.5vw, 9px) clamp(5px, 0.5vw, 9px);
+    background-image: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0.08) 0%,
+      transparent 16%,
+      transparent 70%,
+      rgb(0 0 0 / 0.24) 100%
+    );
+    box-shadow:
+      inset 0 -8px 11px rgb(0 0 0 / 0.28),
+      0 2px 3px rgb(0 0 0 / 0.3);
   }
 }
 
