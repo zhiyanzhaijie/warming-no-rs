@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Bot } from 'lucide-react'
+import { ArrowLeft, Bot, Maximize2, Minimize2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { instrumentOutput } from '../api/instrument'
@@ -12,6 +12,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { useSidebar } from '@/components/ui/sidebar'
 import { AgentPanel } from '../features/agent/AgentPanel'
 import { FallingNotes } from '../features/performance/FallingNotes'
 import { MeasureProgress } from '../features/practice/MeasureProgress'
@@ -22,6 +23,7 @@ import type { PracticeMode, ScoreNote } from '../shared/types/domain'
 
 export function PracticePage() {
   const navigate = useNavigate()
+  const { mode: sidebarMode, setMode: setSidebarMode, toggleFullscreen } = useSidebar()
   const sessionPieceId = usePracticeStore((state) => state.session?.pieceId)
   const setBpm = usePracticeStore((state) => state.setBpm)
   const mode = usePracticeStore((state) => state.mode)
@@ -30,6 +32,7 @@ export function PracticePage() {
   const endSession = usePracticeStore((state) => state.endSession)
   const [consoleExpanded, setConsoleExpanded] = useState(true)
   const [agentPanelOpen, setAgentPanelOpen] = useState(false)
+  const fullscreen = sidebarMode === 'fullscreen'
 
   const pieceId = sessionPieceId
   const { data: score, refetch: refetchScore } = useQuery({
@@ -60,6 +63,7 @@ export function PracticePage() {
   usePracticeShortcuts(
     availableModes,
     () => setAgentPanelOpen((open) => !open),
+    toggleFullscreen,
     exitPractice,
     agentPanelOpen,
   )
@@ -69,6 +73,7 @@ export function PracticePage() {
   }, [availableModes, mode, setMode])
 
   useEffect(() => () => pausePlayback(), [pausePlayback])
+  useEffect(() => () => setSidebarMode('normal'), [setSidebarMode])
 
   if (!sessionPieceId) return <Navigate to="/library" replace />
 
@@ -102,7 +107,8 @@ export function PracticePage() {
           </div>
 
           <div className="ml-auto flex min-w-0 items-center justify-end gap-2">
-            <div className="max-[860px]:hidden">
+            <div className="flex items-center gap-2 max-[860px]:hidden">
+              <FullscreenButton fullscreen={fullscreen} onToggle={toggleFullscreen} />
               <TransportControls compact availableModes={availableModes} />
             </div>
             <Sheet open={agentPanelOpen} onOpenChange={setAgentPanelOpen}>
@@ -133,7 +139,10 @@ export function PracticePage() {
 
         {consoleExpanded ? (
           <div className="hidden border-t border-border px-5 py-3 max-[860px]:block">
-            <TransportControls compact availableModes={availableModes} />
+            <div className="flex items-center gap-2">
+              <FullscreenButton fullscreen={fullscreen} onToggle={toggleFullscreen} />
+              <TransportControls compact availableModes={availableModes} />
+            </div>
           </div>
         ) : null}
         <MeasureProgress
@@ -147,6 +156,24 @@ export function PracticePage() {
         <FallingNotes score={score} />
       </main>
     </div>
+  )
+}
+
+function FullscreenButton({ fullscreen, onToggle }: { fullscreen: boolean; onToggle: () => void }) {
+  const Icon = fullscreen ? Minimize2 : Maximize2
+  const label = fullscreen ? '退出全屏练习' : '进入全屏练习'
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={fullscreen}
+      aria-label={`${label}，快捷键 Ctrl+F`}
+      title={`${label} (Ctrl+F)`}
+      className="grid size-8 shrink-0 place-items-center border border-border text-muted-foreground outline-none transition hover:border-foreground/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      <Icon className="size-3.5" />
+    </button>
   )
 }
 

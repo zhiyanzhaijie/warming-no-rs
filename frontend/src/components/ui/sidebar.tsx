@@ -32,8 +32,13 @@ const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
+type SidebarMode = "normal" | "fullscreen"
+
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
+  mode: SidebarMode
+  setMode: (mode: SidebarMode) => void
+  toggleFullscreen: () => void
   open: boolean
   setOpen: (open: boolean) => void
   openMobile: boolean
@@ -68,6 +73,7 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
+  const [mode, setMode] = React.useState<SidebarMode>("normal")
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -93,6 +99,11 @@ function SidebarProvider({
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
   }, [isMobile, setOpen, setOpenMobile])
 
+  const toggleFullscreen = React.useCallback(() => {
+    setOpenMobile(false)
+    setMode((currentMode) => currentMode === "fullscreen" ? "normal" : "fullscreen")
+  }, [])
+
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -116,6 +127,9 @@ function SidebarProvider({
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({
       state,
+      mode,
+      setMode,
+      toggleFullscreen,
       open,
       setOpen,
       isMobile,
@@ -123,7 +137,7 @@ function SidebarProvider({
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, mode, toggleFullscreen, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
   )
 
   return (
@@ -163,7 +177,9 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const { isMobile, mode, state, openMobile, setOpenMobile } = useSidebar()
+
+  if (mode === "fullscreen") return null
 
   if (collapsible === "none") {
     return (
@@ -305,9 +321,12 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
 }
 
 function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
+  const { mode } = useSidebar()
+
   return (
     <main
       data-slot="sidebar-inset"
+      data-sidebar-mode={mode}
       className={cn(
         "relative flex w-full flex-1 flex-col bg-background",
         "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",

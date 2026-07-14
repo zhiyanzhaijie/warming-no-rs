@@ -13,6 +13,7 @@ const modeCycle: readonly PracticeMode[] = [
 export function usePracticeShortcuts(
   availableModes: ReadonlySet<PracticeMode>,
   toggleAgentPanel: () => void,
+  toggleFullscreen: () => void,
   exitPractice: () => void,
   agentPanelOpen: boolean,
 ) {
@@ -30,6 +31,19 @@ export function usePracticeShortcuts(
     ) {
       event.preventDefault()
       exitPractice()
+      return
+    }
+
+    if (
+      event.code === 'KeyF' &&
+      event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      !isEditableTarget(event.target)
+    ) {
+      event.preventDefault()
+      toggleFullscreen()
       return
     }
 

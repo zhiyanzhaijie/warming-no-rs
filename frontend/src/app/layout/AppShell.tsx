@@ -151,8 +151,8 @@ export function AppShell() {
           <SidebarRail className="after:bg-transparent hover:after:bg-sidebar-border" />
         </Sidebar>
 
-        <SidebarInset className="min-w-0 overflow-hidden bg-background p-2">
-          <main className="route-content h-full min-h-0 min-w-0 overflow-hidden rounded-lg bg-background">
+        <SidebarInset className="min-w-0 overflow-hidden bg-background p-2 data-[sidebar-mode=fullscreen]:p-0">
+          <main className="route-content h-full min-h-0 min-w-0 overflow-hidden rounded-lg bg-background in-data-[sidebar-mode=fullscreen]:rounded-none">
             <div key={location.key} className="route-fallback-enter h-full min-h-0">
               <Outlet />
             </div>
