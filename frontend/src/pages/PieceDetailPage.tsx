@@ -44,7 +44,7 @@ export function PieceDetailPage() {
                   className={[
                     'grid aspect-square place-items-center rounded-sm text-xs font-bold',
                     isHot
-                      ? 'bg-spotify-green text-primary-foreground'
+                      ? 'bg-primary text-primary-foreground'
                       : 'bg-secondary text-muted-foreground',
                   ].join(' ')}
                 >
@@ -76,7 +76,7 @@ export function PieceDetailPage() {
               startSession({ id: piece.id, title: piece.title })
               navigate('/practice', { viewTransition: true })
             }}
-            className="mt-5 inline-flex rounded-full bg-spotify-green px-5 py-2.5 text-sm font-bold uppercase tracking-[1.4px] text-primary-foreground hover:bg-spotify-green-hover"
+            className="mt-5 inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-bold uppercase tracking-[1.4px] text-primary-foreground hover:bg-primary-hover"
           >
             开始练习
           </button>

@@ -520,8 +520,8 @@ function prepareNotes(
       key,
       height: Math.max(2, note.durationBeats * pixelsPerBeat),
       colorClassName: key.isBlack
-        ? 'z-20 border border-[#064a22] bg-[#0b7a34]'
-        : 'z-10 border border-[#168d42] bg-[#35dc71]',
+        ? 'z-20 border'
+        : 'z-10 border',
     })
   }
   return preparedNotes
@@ -538,6 +538,12 @@ function initialNoteStyle(
     height: `${note.height}px`,
     width: `${note.key.widthPx}px`,
     borderRadius: `${noteCornerRadius(note.key)}px`,
+    backgroundColor: note.key.isBlack
+      ? 'color-mix(in srgb, var(--primary) 48%, #000000)'
+      : 'var(--primary)',
+    borderColor: note.key.isBlack
+      ? 'color-mix(in srgb, var(--primary) 32%, #000000)'
+      : 'color-mix(in srgb, var(--primary) 68%, #000000)',
   }
 }
 

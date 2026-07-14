@@ -18,7 +18,7 @@ export function AgentPanel() {
             下一轮建议
           </h2>
         </div>
-        <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-bold text-spotify-green">
+        <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-bold text-primary">
           本地
         </span>
       </div>

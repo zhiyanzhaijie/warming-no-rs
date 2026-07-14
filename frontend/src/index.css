@@ -16,6 +16,7 @@
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -27,8 +28,6 @@
   --color-border: var(--border);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
-  --color-spotify-green: var(--spotify-green);
-  --color-spotify-green-hover: var(--spotify-green-hover);
   --color-near-black: var(--near-black);
   --color-dark-surface: var(--dark-surface);
   --color-mid-dark: var(--mid-dark);
@@ -60,6 +59,7 @@
     --card: #f9f5d7;
     --card-foreground: #282828;
     --primary: #79740e;
+    --primary-hover: #918c18;
     --primary-foreground: #fbf1c7;
     --secondary: #ebdbb2;
     --secondary-foreground: #3c3836;
@@ -87,8 +87,6 @@
     --radius: 0.5rem;
     --chart-3: #af3a03;
     --chart-4: #076678;
-    --spotify-green: #1ed760;
-    --spotify-green-hover: #1fdf64;
     --near-black: #f2e5bc;
     --dark-surface: #f9f5d7;
     --mid-dark: #ebdbb2;
@@ -118,8 +116,9 @@
     --foreground: #ffffff;
     --card: #181818;
     --card-foreground: #ffffff;
-    --primary: #1ed760;
-    --primary-foreground: #000000;
+    --primary: #a8a45c;
+    --primary-hover: #bab66b;
+    --primary-foreground: #12120d;
     --secondary: #1f1f1f;
     --secondary-foreground: #ffffff;
     --muted: #1f1f1f;
@@ -129,7 +128,7 @@
     --destructive: #f3727f;
     --border: #272727;
     --input: #272727;
-    --ring: #1ed760;
+    --ring: #a8a45c;
     --piano-key-white: #d1c9b9;
     --piano-key-white-edge: #777064;
     --piano-key-white-front: #59534a;
@@ -143,8 +142,6 @@
     --piano-key-valid-black: #687526;
     --chart-3: #ffa42b;
     --chart-4: #539df5;
-    --spotify-green: #1ed760;
-    --spotify-green-hover: #1fdf64;
     --near-black: #121212;
     --dark-surface: #181818;
     --mid-dark: #1f1f1f;
@@ -153,12 +150,12 @@
     --near-white: #cbcbcb;
     --sidebar: #121212;
     --sidebar-foreground: #ffffff;
-    --sidebar-primary: #1ed760;
-    --sidebar-primary-foreground: #000000;
+    --sidebar-primary: #a8a45c;
+    --sidebar-primary-foreground: #12120d;
     --sidebar-accent: #1f1f1f;
     --sidebar-accent-foreground: #ffffff;
     --sidebar-border: #272727;
-    --sidebar-ring: #1ed760;
+    --sidebar-ring: #a8a45c;
   }
 
   .immersive-dark {
@@ -167,8 +164,9 @@
     --foreground: #ffffff;
     --card: #181818;
     --card-foreground: #ffffff;
-    --primary: #1ed760;
-    --primary-foreground: #000000;
+    --primary: #aaa75f;
+    --primary-hover: #bbb96f;
+    --primary-foreground: #11120d;
     --secondary: #1f1f1f;
     --secondary-foreground: #ffffff;
     --muted: #1f1f1f;
@@ -178,7 +176,7 @@
     --destructive: #f3727f;
     --border: #272727;
     --input: #272727;
-    --ring: #1ed760;
+    --ring: #aaa75f;
     --piano-key-white: #c8c1b3;
     --piano-key-white-edge: #686258;
     --piano-key-white-front: #4b463f;
@@ -190,8 +188,6 @@
     --piano-key-invalid-lift: #60615a;
     --piano-key-valid-white: #aeb94f;
     --piano-key-valid-black: #58671d;
-    --spotify-green: #1ed760;
-    --spotify-green-hover: #1fdf64;
   }
 
   * {

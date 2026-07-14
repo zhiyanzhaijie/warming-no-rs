@@ -68,7 +68,7 @@ export function AppShell() {
               <span className="relative grid size-8 shrink-0 place-items-center text-sidebar-foreground/60">
                 <InputIcon className="size-4" />
                 <span
-                  className={`absolute bottom-0.5 right-0.5 size-1.5 ${inputStatus === 'error' ? 'bg-destructive' : inputStatus === 'connecting' ? 'animate-pulse bg-primary' : 'bg-spotify-green'}`}
+                  className={`absolute bottom-0.5 right-0.5 size-1.5 ${inputStatus === 'error' ? 'bg-destructive' : inputStatus === 'connecting' ? 'animate-pulse bg-primary' : 'bg-primary'}`}
                   aria-hidden="true"
                 />
               </span>
