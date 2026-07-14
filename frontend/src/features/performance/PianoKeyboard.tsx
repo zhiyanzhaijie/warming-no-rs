@@ -94,7 +94,7 @@ const PianoKey = memo(function PianoKey({
   return (
     <div
       className={cn(
-        'absolute [contain:paint]',
+        'absolute',
         isBlack
           ? 'piano-key-black top-0 z-10'
           : 'piano-key-white inset-y-0',

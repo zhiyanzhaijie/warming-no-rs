@@ -80,10 +80,10 @@
     --piano-key-black-front: #13110e;
     --piano-key-black-label: #ded5c0;
     --piano-key-invalid-lift: #81786b;
-    --piano-key-valid-white: color-mix(in srgb, var(--primary) 82%, var(--piano-key-white));
-    --piano-key-valid-black: color-mix(in srgb, var(--primary) 68%, var(--piano-key-black));
-    --piano-key-invalid-white: color-mix(in srgb, var(--piano-key-white) 62%, #000000);
-    --piano-key-invalid-black: color-mix(in srgb, var(--piano-key-black) 58%, var(--piano-key-invalid-lift));
+    --piano-key-valid-white: #9a9b45;
+    --piano-key-valid-black: #555a20;
+    --piano-key-invalid-white: color-mix(in srgb, var(--piano-key-white) 81%, #000000);
+    --piano-key-invalid-black: color-mix(in srgb, var(--piano-key-black) 79%, var(--piano-key-invalid-lift));
     --radius: 0.5rem;
     --chart-3: #af3a03;
     --chart-4: #076678;
@@ -139,6 +139,8 @@
     --piano-key-black-front: #070805;
     --piano-key-black-label: #c8c1b2;
     --piano-key-invalid-lift: #696861;
+    --piano-key-valid-white: #c0cb62;
+    --piano-key-valid-black: #687526;
     --chart-3: #ffa42b;
     --chart-4: #539df5;
     --spotify-green: #1ed760;
@@ -186,6 +188,8 @@
     --piano-key-black-front: #050604;
     --piano-key-black-label: #bbb5a8;
     --piano-key-invalid-lift: #60615a;
+    --piano-key-valid-white: #aeb94f;
+    --piano-key-valid-black: #58671d;
     --spotify-green: #1ed760;
     --spotify-green-hover: #1fdf64;
   }
@@ -234,16 +238,6 @@
     border-left: clamp(1px, 0.1vw, 2px) solid var(--piano-key-white-edge);
     border-right: clamp(1px, 0.1vw, 2px) solid var(--piano-key-white-edge);
     border-bottom: clamp(3px, 0.28vw, 4px) solid var(--piano-key-white-front);
-    background-image: linear-gradient(
-      90deg,
-      rgb(0 0 0 / 0.09) 0%,
-      transparent 11%,
-      transparent 78%,
-      rgb(255 255 255 / 0.16) 100%
-    );
-    box-shadow:
-      inset 0 -7px 10px rgb(0 0 0 / 0.08),
-      0 1px 2px rgb(0 0 0 / 0.16);
   }
 
   .piano-key-black {
@@ -252,16 +246,6 @@
     border-top: 1px solid color-mix(in srgb, var(--piano-key-black-edge) 72%, transparent);
     border-bottom: clamp(3px, 0.32vw, 5px) solid var(--piano-key-black-front);
     border-radius: 0 0 clamp(5px, 0.5vw, 9px) clamp(5px, 0.5vw, 9px);
-    background-image: linear-gradient(
-      90deg,
-      rgb(255 255 255 / 0.08) 0%,
-      transparent 16%,
-      transparent 70%,
-      rgb(0 0 0 / 0.24) 100%
-    );
-    box-shadow:
-      inset 0 -8px 11px rgb(0 0 0 / 0.28),
-      0 2px 3px rgb(0 0 0 / 0.3);
   }
 }
 

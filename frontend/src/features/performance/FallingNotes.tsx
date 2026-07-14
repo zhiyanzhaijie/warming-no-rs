@@ -425,7 +425,7 @@ export function FallingNotes({ score }: FallingNotesProps) {
       </div>
 
       <div
-        className="pointer-events-none relative z-30 h-3 shrink-0 select-none shadow-[0_5px_12px_rgba(0,0,0,0.28)]"
+        className="pointer-events-none relative z-30 h-3 shrink-0 select-none"
         style={{
           background: 'linear-gradient(180deg, color-mix(in srgb, var(--foreground) 34%, var(--background)) 0%, color-mix(in srgb, var(--foreground) 16%, var(--background)) 34%, var(--background) 58%, color-mix(in srgb, var(--foreground) 20%, var(--background)) 100%)',
         }}
@@ -520,8 +520,8 @@ function prepareNotes(
       key,
       height: Math.max(2, note.durationBeats * pixelsPerBeat),
       colorClassName: key.isBlack
-        ? 'z-20 border border-[#064a22] bg-[#0b7a34] shadow-[0_1px_3px_rgba(0,0,0,0.3)]'
-        : 'z-10 border border-[#168d42] bg-[#35dc71] shadow-[0_1px_3px_rgba(0,0,0,0.18)]',
+        ? 'z-20 border border-[#064a22] bg-[#0b7a34]'
+        : 'z-10 border border-[#168d42] bg-[#35dc71]',
     })
   }
   return preparedNotes
