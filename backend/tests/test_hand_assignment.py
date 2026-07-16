@@ -1,5 +1,21 @@
+from pathlib import Path
+
 from core.adapters.local_midi import parse_midi_score
-from core.domain.music import NoteEvent, PianoScore, ScorePart, assign_hands
+from core.adapters.persistence.sqlite_music_repository import SqliteMusicPieceRepository
+from core.app.music import DynamicProgrammingHandAssignment
+from core.domain.music import (
+    ArrangementId,
+    MusicPiece,
+    MusicPieceId,
+    NoteEvent,
+    PianoArrangement,
+    PianoScore,
+    ScorePart,
+)
+from core.infra.setup import init_app_container
+
+
+hand_assignment = DynamicProgrammingHandAssignment()
 
 
 def note(note_id: str, pitch: int, beat: float, track: int = 0) -> NoteEvent:
@@ -23,7 +39,7 @@ def test_uses_explicit_hand_track_names() -> None:
         notes=[note("left", 60, 0, 0), note("right", 55, 0, 1)],
     )
 
-    analyzed = assign_hands(score)
+    analyzed = hand_assignment.assign(score)
 
     assert [item.hand for item in analyzed.notes] == ["left", "right"]
     assert all(item.hand_confidence == 0.99 for item in analyzed.notes)
@@ -44,7 +60,7 @@ def test_splits_a_mixed_piano_chord_by_pitch_and_continuity() -> None:
         ],
     )
 
-    analyzed = assign_hands(score)
+    analyzed = hand_assignment.assign(score)
     assignments = {item.id: item.hand for item in analyzed.notes}
 
     assert {assignments[item] for item in ("l1", "l2", "l3", "l4")} == {"left"}
@@ -91,3 +107,39 @@ def test_parser_preserves_channel_and_assigns_stable_note_id() -> None:
     assert score.parts[0].channels == (2,)
     assert score.notes[0].id == "t0-c2-n0"
     assert score.notes[0].channel == 2
+    assert score.notes[0].hand == "unknown"
+    assert score.hand_analysis_version is None
+
+
+def test_container_migrates_legacy_hand_assignment_explicitly(tmp_path: Path) -> None:
+    database = tmp_path / "state.db"
+    repository = SqliteMusicPieceRepository(database)
+    piece_id = MusicPieceId.parse("legacy-piece")
+    repository.save_piece(MusicPiece(
+        id=piece_id,
+        title="Legacy",
+        arrangements=[PianoArrangement(
+            id=ArrangementId.parse("legacy-arrangement"),
+            piece_id=piece_id,
+            title="Legacy",
+            source_path="/tmp/legacy.mid",
+            fingerprint="legacy-score",
+            score=PianoScore(
+                parts=[ScorePart(track=0, name="Piano", note_count=2)],
+                notes=[note("low", 48, 0), note("high", 72, 0)],
+            ),
+        )],
+    ))
+
+    before = repository.find_piece(piece_id)
+    assert before is not None
+    assert before.arrangements[0].score.hand_analysis_version is None
+
+    container = init_app_container(str(database))
+    migrated = container.music.query.get_piece(piece_id)
+
+    assert migrated is not None
+    score = migrated.arrangements[0].score
+    assert score.hand_analysis_version == hand_assignment.analysis_version
+    assert {item.hand for item in score.notes} == {"left", "right"}
+    assert init_app_container(str(database)).music.query.get_piece(piece_id) == migrated

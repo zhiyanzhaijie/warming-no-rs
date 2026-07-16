@@ -1,46 +1,17 @@
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from math import ceil
-from typing import Protocol
 from uuid import uuid4
 
 from core.app.app_error import AppError
-from core.app.music.port import MusicPieceRepositoryPort
-from core.domain.fingering import (
-    FingeringAnnotation,
-    FingeringGenerationRequest,
-    FingeringPatch,
-)
 from core.domain.music import MusicPieceId
-from core.domain.piece_stages import PieceStagePlan
-
-
-class FingeringRepositoryPort(Protocol):
-    def list_for_plan(
-        self,
-        plan_id: str,
-        score_fingerprint: str,
-    ) -> list[FingeringAnnotation]: ...
-
-    def replace_for_notes(
-        self,
-        plan_id: str,
-        note_ids: set[str],
-        annotations: list[FingeringAnnotation],
-    ) -> None: ...
-
-
-class FingeringAgentPort(Protocol):
-    def generate(self, request: FingeringGenerationRequest) -> FingeringPatch: ...
-
-
-class PieceStagePlanQueryPort(Protocol):
-    def get_by_id(
-        self,
-        plan_id: str,
-        arrangement_id: str,
-        score_fingerprint: str,
-    ) -> PieceStagePlan | None: ...
+from .policy import FingeringGenerationRequest, FingeringPatch
+from .port import (
+    FingeringAgentPort,
+    FingeringRepositoryPort,
+    MusicPieceRepositoryPort,
+    PieceStagePlanQueryPort,
+)
 
 
 @dataclass(frozen=True)
@@ -133,21 +104,6 @@ class FingeringCommandHandler:
             annotations,
         )
         return replace(patch, annotations=tuple(annotations))
-
-
-class FingeringQueryHandler:
-    def __init__(self, fingerings: FingeringRepositoryPort) -> None:
-        self._fingerings = fingerings
-
-    def list_for_plan(
-        self,
-        plan_id: str,
-        score_fingerprint: str,
-    ) -> list[FingeringAnnotation]:
-        return self._fingerings.list_for_plan(
-            plan_id,
-            score_fingerprint,
-        )
 
 
 def _beats_per_measure(time_signature: str) -> float:

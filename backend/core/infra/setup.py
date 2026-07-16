@@ -11,16 +11,26 @@ from core.adapters.persistence.sqlite_llm_settings_repository import SqliteLlmSe
 from core.adapters.persistence.sqlite_music_repository import SqliteMusicPieceRepository
 from core.adapters.persistence.sqlite_piece_stage_repository import SqlitePieceStageRepository
 from core.app.fingering import FingeringCommandHandler, FingeringQueryHandler
-from core.app.llm_settings import LlmSettingsHandler
-from core.app.music import LocalMidiLibraryHandler, MusicCommandHandler, MusicQueryHandler
-from core.app.piece_stages import PieceStageHandler
+from core.app.llm_settings import LlmSettingsCommandHandler, LlmSettingsQueryHandler
+from core.app.music import (
+    DynamicProgrammingHandAssignment,
+    HandAssignmentMigration,
+    LocalMidiLibraryCommandHandler,
+    LocalMidiLibraryQueryHandler,
+    MusicCommandHandler,
+    MusicQueryHandler,
+    MusicScoreQueryHandler,
+)
+from core.app.piece_stages import PieceStageCommandHandler, PieceStageQueryHandler
 
 
 @dataclass(frozen=True)
 class MusicState:
     command: MusicCommandHandler
     query: MusicQueryHandler
-    local_library: LocalMidiLibraryHandler
+    score_query: MusicScoreQueryHandler
+    local_library: LocalMidiLibraryCommandHandler
+    local_library_query: LocalMidiLibraryQueryHandler
 
 
 @dataclass(frozen=True)
@@ -30,9 +40,21 @@ class FingeringState:
 
 
 @dataclass(frozen=True)
+class LlmSettingsState:
+    command: LlmSettingsCommandHandler
+    query: LlmSettingsQueryHandler
+
+
+@dataclass(frozen=True)
+class PieceStageState:
+    command: PieceStageCommandHandler
+    query: PieceStageQueryHandler
+
+
+@dataclass(frozen=True)
 class AgentState:
-    llm_settings: LlmSettingsHandler
-    piece_stages: PieceStageHandler
+    llm_settings: LlmSettingsState
+    piece_stages: PieceStageState
 
 
 @dataclass(frozen=True)
@@ -52,24 +74,42 @@ def init_app_container(state_path: str | None = None) -> AppContainer:
         database_path=path,
         master_key_path=path.parent / "llm-master.key",
     )
+    hand_assignment = DynamicProgrammingHandAssignment()
+    HandAssignmentMigration(pieces, hand_assignment).migrate()
     music_command = MusicCommandHandler(pieces)
     local_midi = LocalMidiFileAdapter(pieces)
-    llm_settings_handler = LlmSettingsHandler(
+    llm_settings_command = LlmSettingsCommandHandler(
         settings_repository=llm_settings,
         secret_repository=llm_secrets,
         client=OpenAiCompatibleLlmClient(),
+    )
+    llm_settings_query = LlmSettingsQueryHandler(
+        settings_repository=llm_settings,
+        secret_repository=llm_secrets,
+    )
+    fingering_query = FingeringQueryHandler(fingerings)
+    piece_stage_query = PieceStageQueryHandler(
+        pieces=pieces,
+        stages=piece_stages,
     )
     return AppContainer(
         music=MusicState(
             command=music_command,
             query=MusicQueryHandler(pieces),
-            local_library=LocalMidiLibraryHandler(
+            score_query=MusicScoreQueryHandler(
+                pieces=pieces,
+                stage_plans=piece_stage_query,
+                fingerings=fingering_query,
+            ),
+            local_library=LocalMidiLibraryCommandHandler(
                 scanner=local_midi,
                 watcher=local_midi,
                 parser=local_midi,
+                hand_assignment=hand_assignment,
                 pieces=pieces,
                 music_command=music_command,
             ),
+            local_library_query=LocalMidiLibraryQueryHandler(local_midi),
         ),
         fingering=FingeringState(
             command=FingeringCommandHandler(
@@ -78,15 +118,21 @@ def init_app_container(state_path: str | None = None) -> AppContainer:
                 stage_plans=piece_stages,
                 agent=LangGraphFingeringAgent(),
             ),
-            query=FingeringQueryHandler(fingerings),
+            query=fingering_query,
         ),
         agent=AgentState(
-            llm_settings=llm_settings_handler,
-            piece_stages=PieceStageHandler(
-                pieces=pieces,
-                stages=piece_stages,
-                analyzer=OpenAiCompatibleStageAnalyzer(),
-                llm_settings=llm_settings_handler,
+            llm_settings=LlmSettingsState(
+                command=llm_settings_command,
+                query=llm_settings_query,
+            ),
+            piece_stages=PieceStageState(
+                command=PieceStageCommandHandler(
+                    pieces=pieces,
+                    stages=piece_stages,
+                    analyzer=OpenAiCompatibleStageAnalyzer(),
+                    llm_settings=llm_settings_query,
+                ),
+                query=piece_stage_query,
             ),
         ),
     )

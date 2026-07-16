@@ -3,13 +3,13 @@ import hashlib
 import threading
 from pathlib import Path
 
-from core.app.music.local_library_model import DiscoveredMidiFile
-from core.domain.music import NoteEvent, PianoScore, ScorePart, assign_hands
-from core.adapters.persistence.json_music_repository import JsonMusicPieceRepository
+from core.app.music.command import DiscoveredMidiFile
+from core.app.music.port import WatchPathRepositoryPort
+from core.domain.music import NoteEvent, PianoScore, ScorePart
 
 
 class LocalMidiFileAdapter:
-    def __init__(self, repository: JsonMusicPieceRepository) -> None:
+    def __init__(self, repository: WatchPathRepositoryPort) -> None:
         self._repository = repository
         self._lock = threading.RLock()
         self._known_fingerprints: dict[str, str] = {}
@@ -160,13 +160,11 @@ def parse_midi_score(bytes_: bytes) -> PianoScore:
     if not notes:
         raise ValueError("MIDI contains no note events")
     notes.sort(key=lambda note: (note.start_beats, note.pitch, note.track))
-    return assign_hands(
-        PianoScore(
-            parts=parts,
-            notes=notes,
-            tempos=tempos or [120.0],
-            meters=meters or ["4/4"],
-        )
+    return PianoScore(
+        parts=parts,
+        notes=notes,
+        tempos=tempos or [120.0],
+        meters=meters or ["4/4"],
     )
 
 

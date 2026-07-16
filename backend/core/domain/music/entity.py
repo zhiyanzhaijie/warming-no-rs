@@ -60,3 +60,16 @@ class MusicPiece:
     arrangements: list[PianoArrangement] = field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
+
+    def replace_arrangement(
+        self,
+        arrangement: PianoArrangement,
+        updated_at: str,
+    ) -> None:
+        if arrangement.piece_id != self.id:
+            raise ValueError("arrangement belongs to another music piece")
+        self.arrangements = [
+            item for item in self.arrangements if item.id != arrangement.id
+        ]
+        self.arrangements.append(arrangement)
+        self.updated_at = updated_at

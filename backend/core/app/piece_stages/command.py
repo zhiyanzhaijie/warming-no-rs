@@ -1,62 +1,17 @@
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from math import ceil
-from typing import Protocol
 from uuid import uuid4
 
 from core.app.app_error import AppError
-from core.app.music.port import MusicPieceRepositoryPort
-from core.domain.llm_settings import LlmSettings
 from core.domain.music import MusicPieceId, PianoScore
-from core.domain.piece_stages import PieceStage, PieceStagePlan, validate_stage_coverage
-
-
-class PieceStageRepositoryPort(Protocol):
-    def list(
-        self,
-        arrangement_id: str,
-        score_fingerprint: str,
-    ) -> list[PieceStagePlan]: ...
-
-    def get_active(
-        self,
-        arrangement_id: str,
-        score_fingerprint: str,
-    ) -> PieceStagePlan | None: ...
-
-    def get_by_id(
-        self,
-        plan_id: str,
-        arrangement_id: str,
-        score_fingerprint: str,
-    ) -> PieceStagePlan | None: ...
-
-    def save_new(self, plan: PieceStagePlan) -> None: ...
-
-    def replace(self, plan: PieceStagePlan) -> None: ...
-
-    def rename(self, plan_id: str, arrangement_id: str, name: str) -> None: ...
-
-    def delete(self, plan_id: str, arrangement_id: str) -> bool: ...
-
-    def activate(self, plan_id: str, arrangement_id: str) -> None: ...
-
-
-class PieceStageAnalyzerPort(Protocol):
-    def analyze(
-        self,
-        title: str,
-        score: PianoScore,
-        settings: LlmSettings,
-        api_key: str,
-        instruction: str,
-    ) -> tuple[PieceStage, ...]: ...
-
-
-class LlmSettingsQueryPort(Protocol):
-    def get(self) -> LlmSettings: ...
-
-    def get_api_key(self) -> str | None: ...
+from core.domain.piece_stages import PieceStagePlan
+from .port import (
+    LlmSettingsQueryPort,
+    MusicPieceRepositoryPort,
+    PieceStageAnalyzerPort,
+    PieceStageRepositoryPort,
+)
 
 
 @dataclass(frozen=True)
@@ -87,7 +42,7 @@ class ActivatePieceStagePlanCommand:
     plan_id: str
 
 
-class PieceStageHandler:
+class PieceStageCommandHandler:
     def __init__(
         self,
         pieces: MusicPieceRepositoryPort,
@@ -99,26 +54,6 @@ class PieceStageHandler:
         self._stages = stages
         self._analyzer = analyzer
         self._llm_settings = llm_settings
-
-    def list(self, piece_id: MusicPieceId) -> list[PieceStagePlan]:
-        arrangement = self._arrangement(piece_id)
-        return self._stages.list(arrangement.id.value, arrangement.fingerprint)
-
-    def get(self, piece_id: MusicPieceId) -> PieceStagePlan | None:
-        arrangement = self._arrangement(piece_id)
-        return self._stages.get_active(arrangement.id.value, arrangement.fingerprint)
-
-    def get_by_id(
-        self,
-        piece_id: MusicPieceId,
-        plan_id: str,
-    ) -> PieceStagePlan | None:
-        arrangement = self._arrangement(piece_id)
-        return self._stages.get_by_id(
-            plan_id,
-            arrangement.id.value,
-            arrangement.fingerprint,
-        )
 
     def analyze(self, command: AnalyzePieceStagesCommand) -> PieceStagePlan:
         piece = self._pieces.find_piece(command.piece_id)
@@ -153,7 +88,7 @@ class PieceStageHandler:
                 instruction=prompt,
             )
             stages = tuple(replace(stage, id=uuid4().hex) for stage in stages)
-            validate_stage_coverage(stages, _measure_count(arrangement.score))
+            PieceStagePlan.validate_coverage(stages, _measure_count(arrangement.score))
         except ValueError as error:
             raise AppError.validation(str(error)) from error
         except Exception as error:

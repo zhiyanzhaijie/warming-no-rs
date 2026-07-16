@@ -43,17 +43,17 @@ class PieceStagePlan:
     def stage(self, stage_id: str) -> PieceStage | None:
         return next((stage for stage in self.stages if stage.id == stage_id), None)
 
-
-def validate_stage_coverage(
-    stages: tuple[PieceStage, ...],
-    measure_count: int,
-) -> None:
-    if not stages:
-        raise ValueError("stage analysis returned no stages")
-    expected_start = 1
-    for stage in stages:
-        if stage.start_measure != expected_start:
-            raise ValueError("piece stages must be continuous")
-        expected_start = stage.end_measure + 1
-    if expected_start != measure_count + 1:
-        raise ValueError("piece stages do not cover the complete score")
+    @staticmethod
+    def validate_coverage(
+        stages: tuple[PieceStage, ...],
+        measure_count: int,
+    ) -> None:
+        if not stages:
+            raise ValueError("stage analysis returned no stages")
+        expected_start = 1
+        for stage in stages:
+            if stage.start_measure != expected_start:
+                raise ValueError("piece stages must be continuous")
+            expected_start = stage.end_measure + 1
+        if expected_start != measure_count + 1:
+            raise ValueError("piece stages do not cover the complete score")

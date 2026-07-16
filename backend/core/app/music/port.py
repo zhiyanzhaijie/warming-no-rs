@@ -1,7 +1,17 @@
-from typing import Protocol
+from __future__ import annotations
 
-from core.domain.music import MusicPiece, MusicPieceId, PianoScore
-from .local_library_model import DiscoveredMidiFile
+from typing import TYPE_CHECKING, Protocol
+
+from core.domain.fingering import FingeringAnnotation
+from core.domain.music import MusicPiece, MusicPieceId, PianoArrangement, PianoScore
+from core.domain.piece_stages import PieceStagePlan
+
+if TYPE_CHECKING:
+    from .command import (
+        CreateMusicPieceCommand,
+        DiscoveredMidiFile,
+        ImportPianoArrangementCommand,
+    )
 
 
 class MusicPieceRepositoryPort(Protocol):
@@ -12,6 +22,33 @@ class MusicPieceRepositoryPort(Protocol):
     def list_pieces(self) -> list[MusicPiece]: ...
 
     def delete_piece(self, piece_id: MusicPieceId) -> bool: ...
+
+
+class MusicCommandPort(Protocol):
+    def create_piece(self, command: CreateMusicPieceCommand) -> MusicPiece: ...
+
+    def import_arrangement(
+        self,
+        command: ImportPianoArrangementCommand,
+    ) -> PianoArrangement: ...
+
+
+class ActivePieceStageQueryPort(Protocol):
+    def get(self, piece_id: MusicPieceId) -> PieceStagePlan | None: ...
+
+
+class FingeringQueryPort(Protocol):
+    def list_for_plan(
+        self,
+        plan_id: str,
+        score_fingerprint: str,
+    ) -> list[FingeringAnnotation]: ...
+
+
+class WatchPathRepositoryPort(Protocol):
+    def list_watch_paths(self) -> list[str]: ...
+
+    def save_watch_paths(self, paths: list[str]) -> None: ...
 
 
 class LocalMidiScannerPort(Protocol):
@@ -30,3 +67,10 @@ class LocalMidiWatcherPort(Protocol):
 
 class LocalMidiScoreParserPort(Protocol):
     def parse_score(self, path: str) -> PianoScore: ...
+
+
+class HandAssignmentPolicy(Protocol):
+    @property
+    def analysis_version(self) -> str: ...
+
+    def assign(self, score: PianoScore) -> PianoScore: ...

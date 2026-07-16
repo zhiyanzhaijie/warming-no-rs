@@ -12,8 +12,6 @@ from core.domain.music import (
     PianoArrangement,
     PianoScore,
     ScorePart,
-    HAND_ANALYSIS_VERSION,
-    assign_hands,
 )
 
 
@@ -166,13 +164,7 @@ class SqliteMusicPieceRepository:
         ).fetchall()
         piece.arrangements = []
         for item in arrangements:
-            raw_score = json.loads(item["score_json"])
-            score = score_from_dict(raw_score)
-            if raw_score.get("hand_analysis_version") != score.hand_analysis_version:
-                connection.execute(
-                    "update piano_arrangements set score_json = ? where id = ?",
-                    (json.dumps(score_to_dict(score), ensure_ascii=False), item["id"]),
-                )
+            score = score_from_dict(json.loads(item["score_json"]))
             piece.arrangements.append(PianoArrangement(
                 id=ArrangementId.parse(item["id"]),
                 piece_id=MusicPieceId.parse(item["piece_id"]),
@@ -254,6 +246,4 @@ def score_from_dict(data: dict[str, Any]) -> PianoScore:
         meters=list(data.get("meters", [])),
         hand_analysis_version=data.get("hand_analysis_version"),
     )
-    if score.hand_analysis_version != HAND_ANALYSIS_VERSION:
-        return assign_hands(score)
     return score

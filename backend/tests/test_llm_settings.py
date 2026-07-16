@@ -4,7 +4,11 @@ import pytest
 
 from core.adapters.persistence.sqlite_llm_settings_repository import SqliteLlmSettingsRepository
 from core.app.app_error import AppError
-from core.app.llm_settings import LlmConnectionResult, LlmSettingsHandler
+from core.app.llm_settings import (
+    LlmConnectionResult,
+    LlmSettingsCommandHandler,
+    LlmSettingsQueryHandler,
+)
 from core.domain.llm_settings import DEEPSEEK_BASE_URL, DEEPSEEK_CHAT_MODEL, LlmSettings
 
 
@@ -38,30 +42,38 @@ class FakeSecretRepository:
         self.api_key = None
 
 
-def build_handler(tmp_path: Path) -> tuple[LlmSettingsHandler, FakeLlmClient]:
+def build_handlers(
+    tmp_path: Path,
+) -> tuple[LlmSettingsCommandHandler, LlmSettingsQueryHandler, FakeLlmClient]:
     client = FakeLlmClient()
-    handler = LlmSettingsHandler(
-        settings_repository=SqliteLlmSettingsRepository(tmp_path / "state.db"),
-        secret_repository=FakeSecretRepository(),
+    settings = SqliteLlmSettingsRepository(tmp_path / "state.db")
+    secrets = FakeSecretRepository()
+    command = LlmSettingsCommandHandler(
+        settings_repository=settings,
+        secret_repository=secrets,
         client=client,
     )
-    return handler, client
+    query = LlmSettingsQueryHandler(
+        settings_repository=settings,
+        secret_repository=secrets,
+    )
+    return command, query, client
 
 
 def test_uses_deepseek_as_default_configuration(tmp_path: Path) -> None:
-    handler, _ = build_handler(tmp_path)
+    _, query, _ = build_handlers(tmp_path)
 
-    settings = handler.get()
+    settings = query.get()
 
     assert settings.base_url == DEEPSEEK_BASE_URL
     assert settings.model == DEEPSEEK_CHAT_MODEL
 
 
 def test_persists_only_non_secret_model_configuration(tmp_path: Path) -> None:
-    handler, _ = build_handler(tmp_path)
+    command, query, _ = build_handlers(tmp_path)
 
-    saved = handler.save("https://gateway.example.com/v1/", "custom-chat")
-    restored = handler.get()
+    saved = command.save("https://gateway.example.com/v1/", "custom-chat")
+    restored = query.get()
 
     assert restored == saved
     assert restored.base_url == "https://gateway.example.com/v1"
@@ -69,9 +81,9 @@ def test_persists_only_non_secret_model_configuration(tmp_path: Path) -> None:
 
 
 def test_connection_uses_transient_api_key(tmp_path: Path) -> None:
-    handler, client = build_handler(tmp_path)
+    command, _, client = build_handlers(tmp_path)
 
-    result = handler.test_connection(
+    result = command.test_connection(
         base_url=DEEPSEEK_BASE_URL,
         model=DEEPSEEK_CHAT_MODEL,
         api_key="secret-key",
@@ -83,20 +95,20 @@ def test_connection_uses_transient_api_key(tmp_path: Path) -> None:
 
 
 def test_saved_api_key_is_used_when_test_input_is_empty(tmp_path: Path) -> None:
-    handler, client = build_handler(tmp_path)
-    handler.save(DEEPSEEK_BASE_URL, DEEPSEEK_CHAT_MODEL, "stored-secret")
+    command, _, client = build_handlers(tmp_path)
+    command.save(DEEPSEEK_BASE_URL, DEEPSEEK_CHAT_MODEL, "stored-secret")
 
-    handler.test_connection(DEEPSEEK_BASE_URL, DEEPSEEK_CHAT_MODEL, "")
+    command.test_connection(DEEPSEEK_BASE_URL, DEEPSEEK_CHAT_MODEL, "")
 
     assert client.request is not None
     assert client.request[1] == "stored-secret"
 
 
 def test_connection_requires_api_key(tmp_path: Path) -> None:
-    handler, _ = build_handler(tmp_path)
+    command, _, _ = build_handlers(tmp_path)
 
     with pytest.raises(AppError, match="API Key"):
-        handler.test_connection(
+        command.test_connection(
             base_url=DEEPSEEK_BASE_URL,
             model=DEEPSEEK_CHAT_MODEL,
             api_key="",

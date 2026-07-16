@@ -2,14 +2,21 @@ from dataclasses import replace
 import re
 from statistics import median
 
-from .entity import NoteEvent, PianoScore, ScorePart
+from core.domain.music import NoteEvent, PianoScore, ScorePart
 
 
 HAND_ANALYSIS_VERSION = "dp-v1"
 ONSET_GROUP_TOLERANCE_BEATS = 0.08
 
 
-def assign_hands(score: PianoScore) -> PianoScore:
+class DynamicProgrammingHandAssignment:
+    analysis_version = HAND_ANALYSIS_VERSION
+
+    def assign(self, score: PianoScore) -> PianoScore:
+        return _assign_hands(score)
+
+
+def _assign_hands(score: PianoScore) -> PianoScore:
     if not score.notes:
         return replace(score, hand_analysis_version=HAND_ANALYSIS_VERSION)
 

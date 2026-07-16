@@ -1,9 +1,9 @@
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from typing import Protocol
 
 from core.app.app_error import AppError
 from core.domain.llm_settings import LlmSettings
+from .port import LlmClientPort, LlmSecretRepositoryPort, LlmSettingsRepositoryPort
 
 
 @dataclass(frozen=True)
@@ -12,31 +12,7 @@ class LlmConnectionResult:
     latency_ms: int
 
 
-class LlmSettingsRepositoryPort(Protocol):
-    def get(self) -> LlmSettings | None: ...
-
-    def save(self, settings: LlmSettings) -> None: ...
-
-
-class LlmClientPort(Protocol):
-    def test_connection(
-        self,
-        settings: LlmSettings,
-        api_key: str,
-    ) -> LlmConnectionResult: ...
-
-
-class LlmSecretRepositoryPort(Protocol):
-    def has_api_key(self) -> bool: ...
-
-    def save_api_key(self, api_key: str) -> None: ...
-
-    def get_api_key(self) -> str | None: ...
-
-    def delete_api_key(self) -> None: ...
-
-
-class LlmSettingsHandler:
+class LlmSettingsCommandHandler:
     def __init__(
         self,
         settings_repository: LlmSettingsRepositoryPort,
@@ -46,15 +22,6 @@ class LlmSettingsHandler:
         self._settings_repository = settings_repository
         self._secret_repository = secret_repository
         self._client = client
-
-    def get(self) -> LlmSettings:
-        return self._settings_repository.get() or LlmSettings.deepseek_default()
-
-    def has_api_key(self) -> bool:
-        return self._secret_repository.has_api_key()
-
-    def get_api_key(self) -> str | None:
-        return self._secret_repository.get_api_key()
 
     def save(self, base_url: str, model: str, api_key: str = "") -> LlmSettings:
         try:

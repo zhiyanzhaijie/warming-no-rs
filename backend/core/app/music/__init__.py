@@ -1,5 +1,22 @@
-from .command import MusicCommandHandler
-from .local_library import LocalMidiLibraryHandler
-from .query import MusicQueryHandler
+from .command import (
+    HandAssignmentMigration,
+    LocalMidiLibraryCommandHandler,
+    MusicCommandHandler,
+)
+from .policy import HAND_ANALYSIS_VERSION, DynamicProgrammingHandAssignment
+from .query import (
+    LocalMidiLibraryQueryHandler,
+    MusicQueryHandler,
+    MusicScoreQueryHandler,
+)
 
-__all__ = ["LocalMidiLibraryHandler", "MusicCommandHandler", "MusicQueryHandler"]
+__all__ = [
+    "HAND_ANALYSIS_VERSION",
+    "DynamicProgrammingHandAssignment",
+    "HandAssignmentMigration",
+    "LocalMidiLibraryCommandHandler",
+    "LocalMidiLibraryQueryHandler",
+    "MusicCommandHandler",
+    "MusicQueryHandler",
+    "MusicScoreQueryHandler",
+]

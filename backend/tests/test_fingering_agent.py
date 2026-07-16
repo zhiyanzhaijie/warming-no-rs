@@ -3,6 +3,8 @@ from dataclasses import replace
 from datetime import datetime, timezone
 
 from core.adapters.persistence.sqlite_piece_stage_repository import SqlitePieceStageRepository
+from core.app.fingering import FingeringGenerationRequest, FingeringPlanner
+from core.app.music import HAND_ANALYSIS_VERSION
 from core.app.fingering import GenerateFingeringCommand
 from core.app.music.command import (
     CreateMusicPieceCommand,
@@ -10,12 +12,11 @@ from core.app.music.command import (
 )
 from core.domain.music import (
     ArrangementId,
-    HAND_ANALYSIS_VERSION,
     MusicPieceId,
     NoteEvent,
     PianoScore,
 )
-from core.domain.fingering import FingeringAnnotation, FingeringGenerationRequest, FingeringPlanner
+from core.domain.fingering import FingeringAnnotation
 from core.domain.piece_stages import PieceStage, PieceStagePlan
 from core.infra.setup import init_app_container
 
@@ -103,6 +104,15 @@ def test_generates_labels_for_selected_measure(tmp_path: Path) -> None:
         plan.id,
         "changed-midi",
     ) == []
+
+    score = container.music.score_query.get(piece_id)
+    assert score is not None
+    assert {item.note_id for item in score.annotations} == {
+        "r-1",
+        "r-2",
+        "r-3",
+        "r-4",
+    }
 
 
 def test_assigns_unique_fingers_to_a_chord(tmp_path: Path) -> None:

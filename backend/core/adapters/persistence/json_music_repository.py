@@ -11,8 +11,6 @@ from core.domain.music import (
     PianoArrangement,
     PianoScore,
     ScorePart,
-    HAND_ANALYSIS_VERSION,
-    assign_hands,
 )
 
 
@@ -176,8 +174,4 @@ def score_from_dict(data: dict[str, Any]) -> PianoScore:
         meters=list(data.get("meters", [])),
         hand_analysis_version=data.get("hand_analysis_version"),
     )
-    return (
-        score
-        if score.hand_analysis_version == HAND_ANALYSIS_VERSION
-        else assign_hands(score)
-    )
+    return score

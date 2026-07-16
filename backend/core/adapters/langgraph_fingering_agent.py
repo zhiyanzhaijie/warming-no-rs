@@ -1,6 +1,6 @@
 from typing import Any, TypedDict
 
-from core.domain.fingering import FingeringGenerationRequest, FingeringPatch, FingeringPlanner
+from core.app.fingering import FingeringGenerationRequest, FingeringPatch, FingeringPlanner
 
 
 class _FingeringState(TypedDict, total=False):

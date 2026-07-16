@@ -7,7 +7,8 @@ from core.adapters.persistence.sqlite_piece_stage_repository import SqlitePieceS
 from core.app.piece_stages import (
     AnalyzePieceStagesCommand,
     DeletePieceStagePlanCommand,
-    PieceStageHandler,
+    PieceStageCommandHandler,
+    PieceStageQueryHandler,
     RenamePieceStagePlanCommand,
 )
 from core.domain.llm_settings import LlmSettings
@@ -78,19 +79,20 @@ def create_handler(tmp_path: Path):
     ))
     stages = SqlitePieceStageRepository(database)
     analyzer = FakeStageAnalyzer()
-    handler = PieceStageHandler(
+    command = PieceStageCommandHandler(
         pieces=pieces,
         stages=stages,
         analyzer=analyzer,
         llm_settings=FakeLlmSettings(),
     )
-    return handler, stages, analyzer, piece_id, arrangement_id
+    query = PieceStageQueryHandler(pieces=pieces, stages=stages)
+    return command, query, stages, analyzer, piece_id, arrangement_id
 
 
 def test_analyzes_and_persists_continuous_piece_stages(tmp_path: Path) -> None:
-    handler, stages, analyzer, piece_id, arrangement_id = create_handler(tmp_path)
+    command, _, stages, analyzer, piece_id, arrangement_id = create_handler(tmp_path)
 
-    plan = handler.analyze(AnalyzePieceStagesCommand(
+    plan = command.analyze(AnalyzePieceStagesCommand(
         piece_id=piece_id,
         name="节奏型",
         prompt="优先按照节奏变化分段",
@@ -108,24 +110,24 @@ def test_analyzes_and_persists_continuous_piece_stages(tmp_path: Path) -> None:
 
 
 def test_multiple_stage_plans_coexist_and_regeneration_reuses_plan_id(tmp_path: Path) -> None:
-    handler, _, analyzer, piece_id, _ = create_handler(tmp_path)
-    rhythm = handler.analyze(AnalyzePieceStagesCommand(
+    command, query, _, analyzer, piece_id, _ = create_handler(tmp_path)
+    rhythm = command.analyze(AnalyzePieceStagesCommand(
         piece_id=piece_id,
         name="节奏型",
         prompt="按节奏分段",
     ))
-    emotion = handler.analyze(AnalyzePieceStagesCommand(
+    emotion = command.analyze(AnalyzePieceStagesCommand(
         piece_id=piece_id,
         name="情绪型",
         prompt="按情绪分段",
     ))
 
-    updated = handler.analyze(AnalyzePieceStagesCommand(
+    updated = command.analyze(AnalyzePieceStagesCommand(
         piece_id=piece_id,
         plan_id=rhythm.id,
         prompt="优先保留重复节奏型",
     ))
-    plans = handler.list(piece_id)
+    plans = query.list(piece_id)
 
     assert {plan.id for plan in plans} == {rhythm.id, emotion.id}
     assert updated.id == rhythm.id
@@ -135,14 +137,14 @@ def test_multiple_stage_plans_coexist_and_regeneration_reuses_plan_id(tmp_path: 
 
 
 def test_rename_stage_plan_does_not_run_analysis_or_increment_generation(tmp_path: Path) -> None:
-    handler, _, analyzer, piece_id, _ = create_handler(tmp_path)
-    plan = handler.analyze(AnalyzePieceStagesCommand(
+    command, _, _, analyzer, piece_id, _ = create_handler(tmp_path)
+    plan = command.analyze(AnalyzePieceStagesCommand(
         piece_id=piece_id,
         name="原方案",
         prompt="按节奏分段",
     ))
 
-    renamed = handler.rename(RenamePieceStagePlanCommand(
+    renamed = command.rename(RenamePieceStagePlanCommand(
         piece_id=piece_id,
         plan_id=plan.id,
         name="新方案",
@@ -156,20 +158,20 @@ def test_rename_stage_plan_does_not_run_analysis_or_increment_generation(tmp_pat
 
 
 def test_delete_plan_keeps_other_plan_and_selects_replacement(tmp_path: Path) -> None:
-    handler, _, _, piece_id, _ = create_handler(tmp_path)
-    first = handler.analyze(AnalyzePieceStagesCommand(piece_id=piece_id, name="方案一"))
-    second = handler.analyze(AnalyzePieceStagesCommand(piece_id=piece_id, name="方案二"))
+    command, query, _, _, piece_id, _ = create_handler(tmp_path)
+    first = command.analyze(AnalyzePieceStagesCommand(piece_id=piece_id, name="方案一"))
+    second = command.analyze(AnalyzePieceStagesCommand(piece_id=piece_id, name="方案二"))
 
-    assert handler.delete(DeletePieceStagePlanCommand(piece_id, second.id)) is True
+    assert command.delete(DeletePieceStagePlanCommand(piece_id, second.id)) is True
 
-    remaining = handler.list(piece_id)
+    remaining = query.list(piece_id)
     assert [plan.id for plan in remaining] == [first.id]
-    assert handler.get(piece_id).id == first.id
+    assert query.get(piece_id).id == first.id
 
 
 def test_stage_plan_isolated_by_midi_fingerprint(tmp_path: Path) -> None:
-    handler, stages, _, piece_id, arrangement_id = create_handler(tmp_path)
-    plan = handler.analyze(AnalyzePieceStagesCommand(piece_id))
+    command, _, stages, _, piece_id, arrangement_id = create_handler(tmp_path)
+    plan = command.analyze(AnalyzePieceStagesCommand(piece_id))
 
     assert stages.get_by_id(plan.id, arrangement_id.value, "score-v2") is None
 
