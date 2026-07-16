@@ -8,6 +8,7 @@ from core.app.piece_stages import (
     AnalyzePieceStagesCommand,
     DeletePieceStagePlanCommand,
     PieceStageHandler,
+    RenamePieceStagePlanCommand,
 )
 from core.domain.llm_settings import LlmSettings
 from core.domain.music import (
@@ -131,6 +132,27 @@ def test_multiple_stage_plans_coexist_and_regeneration_reuses_plan_id(tmp_path: 
     assert updated.generation == 2
     assert updated.segmentation_prompt == "优先保留重复节奏型"
     assert analyzer.instructions[-1] == "优先保留重复节奏型"
+
+
+def test_rename_stage_plan_does_not_run_analysis_or_increment_generation(tmp_path: Path) -> None:
+    handler, _, analyzer, piece_id, _ = create_handler(tmp_path)
+    plan = handler.analyze(AnalyzePieceStagesCommand(
+        piece_id=piece_id,
+        name="原方案",
+        prompt="按节奏分段",
+    ))
+
+    renamed = handler.rename(RenamePieceStagePlanCommand(
+        piece_id=piece_id,
+        plan_id=plan.id,
+        name="新方案",
+    ))
+
+    assert renamed.id == plan.id
+    assert renamed.name == "新方案"
+    assert renamed.generation == plan.generation
+    assert renamed.stages == plan.stages
+    assert analyzer.instructions == ["按节奏分段"]
 
 
 def test_delete_plan_keeps_other_plan_and_selects_replacement(tmp_path: Path) -> None:

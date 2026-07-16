@@ -47,6 +47,7 @@ pub fn run() {
             llm_settings::music_get_stage_plan,
             llm_settings::music_list_stage_plans,
             llm_settings::music_analyze_stages,
+            llm_settings::music_rename_stage_plan,
             llm_settings::music_activate_stage_plan,
             llm_settings::music_delete_stage_plan,
             transcription::check_transkun,

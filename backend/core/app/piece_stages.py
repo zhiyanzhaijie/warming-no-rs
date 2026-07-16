@@ -35,6 +35,8 @@ class PieceStageRepositoryPort(Protocol):
 
     def replace(self, plan: PieceStagePlan) -> None: ...
 
+    def rename(self, plan_id: str, arrangement_id: str, name: str) -> None: ...
+
     def delete(self, plan_id: str, arrangement_id: str) -> bool: ...
 
     def activate(self, plan_id: str, arrangement_id: str) -> None: ...
@@ -70,6 +72,13 @@ class AnalyzePieceStagesCommand:
 class DeletePieceStagePlanCommand:
     piece_id: MusicPieceId
     plan_id: str
+
+
+@dataclass(frozen=True)
+class RenamePieceStagePlanCommand:
+    piece_id: MusicPieceId
+    plan_id: str
+    name: str
 
 
 @dataclass(frozen=True)
@@ -173,6 +182,23 @@ class PieceStageHandler:
     def delete(self, command: DeletePieceStagePlanCommand) -> bool:
         arrangement = self._arrangement(command.piece_id)
         return self._stages.delete(command.plan_id, arrangement.id.value)
+
+    def rename(self, command: RenamePieceStagePlanCommand) -> PieceStagePlan:
+        arrangement = self._arrangement(command.piece_id)
+        existing = self._stages.get_by_id(
+            command.plan_id,
+            arrangement.id.value,
+            arrangement.fingerprint,
+        )
+        if existing is None:
+            raise AppError.not_found("piece stage plan not found")
+        name = command.name.strip()
+        if not name:
+            raise AppError.validation("分段方案名称不能为空")
+        if name == existing.name:
+            return existing
+        self._stages.rename(existing.id, arrangement.id.value, name)
+        return replace(existing, name=name)
 
     def activate(self, command: ActivatePieceStagePlanCommand) -> PieceStagePlan:
         arrangement = self._arrangement(command.piece_id)

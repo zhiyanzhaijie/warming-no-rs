@@ -3,14 +3,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: SpotifyMixUI, CircularSp-Arab, CircularSp-Hebr, CircularSp-Cyrl,
-    CircularSp-Grek, CircularSp-Deva, "Helvetica Neue", helvetica, arial,
-    "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, "MS Gothic",
-    ui-sans-serif, system-ui, sans-serif;
-  --font-title: SpotifyMixUITitle, CircularSp-Arab, CircularSp-Hebr,
-    CircularSp-Cyrl, CircularSp-Grek, CircularSp-Deva, "Helvetica Neue",
-    helvetica, arial, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo,
-    "MS Gothic", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: ui-monospace, monospace;
+  --font-title: var(--font-sans);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

@@ -8,6 +8,7 @@ from core.app.piece_stages import (
     ActivatePieceStagePlanCommand,
     AnalyzePieceStagesCommand,
     DeletePieceStagePlanCommand,
+    RenamePieceStagePlanCommand,
 )
 from core.domain.music import MusicPiece, MusicPieceId
 from core.infra.setup import init_app_container
@@ -104,6 +105,13 @@ def dispatch(method: str, params: dict[str, Any]) -> Any:
             plan_id=str(params["plan_id"]) if params.get("plan_id") else None,
             name=str(params["name"]) if params.get("name") is not None else None,
             prompt=str(params["prompt"]) if params.get("prompt") is not None else None,
+        ))
+        return piece_stage_plan_response(plan)
+    if method == "music_rename_stage_plan":
+        plan = container.agent.piece_stages.rename(RenamePieceStagePlanCommand(
+            piece_id=MusicPieceId.parse(params["piece_id"]),
+            plan_id=str(params["plan_id"]),
+            name=str(params["name"]),
         ))
         return piece_stage_plan_response(plan)
     if method == "music_activate_stage_plan":

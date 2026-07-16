@@ -35,6 +35,13 @@ export const pieceStagesApi = {
       prompt,
     })
   },
+  rename(pieceId: string, planId: string, name: string) {
+    return invoke<PieceStagePlan>('music_rename_stage_plan', {
+      pieceId,
+      planId,
+      name,
+    })
+  },
   activate(pieceId: string, planId: string) {
     return invoke<PieceStagePlan>('music_activate_stage_plan', { pieceId, planId })
   },

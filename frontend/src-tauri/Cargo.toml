@@ -1,8 +1,8 @@
 [package]
-name = "agent-piano"
+name = "Warming"
 version = "0.1.0"
 description = "Local-first piano practice desktop app"
-authors = ["zyzj"]
+authors = ["zhiyanzhaijie"]
 license = ""
 repository = ""
 edition = "2021"

@@ -82,5 +82,5 @@ export const usePracticeStore = create<PracticeState>((set) => ({
       loopEnabled: !state.loopEnabled,
       loopRange: state.loopRange ?? defaultRange,
     })),
-  setLoopRange: (loopRange) => set({ loopRange }),
+  setLoopRange: (loopRange) => set({ loopRange, loopEnabled: true }),
 }))

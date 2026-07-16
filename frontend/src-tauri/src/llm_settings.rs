@@ -76,6 +76,23 @@ pub async fn music_analyze_stages(
 }
 
 #[tauri::command]
+pub async fn music_rename_stage_plan(
+    piece_id: String,
+    plan_id: String,
+    name: String,
+) -> Result<Value, String> {
+    python_sidecar::call_async(
+        "music_rename_stage_plan",
+        json!({
+            "piece_id": piece_id,
+            "plan_id": plan_id,
+            "name": name,
+        }),
+    )
+    .await
+}
+
+#[tauri::command]
 pub async fn music_activate_stage_plan(piece_id: String, plan_id: String) -> Result<Value, String> {
     python_sidecar::call_async(
         "music_activate_stage_plan",

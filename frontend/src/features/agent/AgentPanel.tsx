@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query'
 import {
   AlertTriangle,
+  ArrowRight,
   Check,
   ChevronRight,
   Fingerprint,
@@ -28,6 +29,8 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { fingeringApi } from '../../api/fingering'
 import { pieceStagesApi, type PieceStage, type PieceStagePlan } from '../../api/pieceStages'
+import { buildMeasureTimings } from '../practice/measureTiming'
+import { usePracticeStore, type LoopRange } from '../practice/practiceStore'
 import type { FingeringPatch, PieceScore } from '../../shared/types/domain'
 
 type AgentPanelProps = {
@@ -39,11 +42,9 @@ type FingeringTarget = {
   stageId: string
 }
 
-type PlanDraft = {
-  mode: 'create' | 'edit'
-  name: string
-  prompt: string
-}
+type PlanDraft =
+  | { mode: 'create'; name: string; prompt: string }
+  | { mode: 'edit'; planId: string; name: string; prompt: string }
 
 type AnalyzePlanInput = {
   planId?: string
@@ -51,8 +52,14 @@ type AnalyzePlanInput = {
   prompt: string
 }
 
+type RenamePlanInput = {
+  planId: string
+  name: string
+}
+
 export function AgentPanel({ score }: AgentPanelProps) {
   const queryClient = useQueryClient()
+  const setLoopRange = usePracticeStore((state) => state.setLoopRange)
   const pieceId = score?.pieceId ?? ''
   const plansQueryKey = ['piece-stage-plans', pieceId] as const
   const [selectedStageId, setSelectedStageId] = useState('')
@@ -66,6 +73,9 @@ export function AgentPanel({ score }: AgentPanelProps) {
   })
   const plans = plansQuery.data ?? []
   const activePlan = plans.find((plan) => plan.isActive) ?? plans[0] ?? null
+  const editedPlan = draft?.mode === 'edit'
+    ? plans.find((plan) => plan.id === draft.planId) ?? null
+    : null
   const selectedStage = selectStage(activePlan, selectedStageId)
 
   const analyzePlan = useMutation({
@@ -84,6 +94,20 @@ export function AgentPanel({ score }: AgentPanelProps) {
       setDraft(null)
       setConfirmingDelete(false)
       await queryClient.invalidateQueries({ queryKey: ['piece-score', pieceId] })
+    },
+  })
+  const renamePlan = useMutation({
+    mutationFn: (input: RenamePlanInput) => pieceStagesApi.rename(
+      pieceId,
+      input.planId,
+      input.name,
+    ),
+    onSuccess: (renamedPlan) => {
+      queryClient.setQueryData<PieceStagePlan[]>(plansQueryKey, (current = []) =>
+        current.map((plan) => plan.id === renamedPlan.id ? renamedPlan : plan),
+      )
+      setDraft(null)
+      setConfirmingDelete(false)
     },
   })
   const activatePlan = useMutation({
@@ -125,32 +149,56 @@ export function AgentPanel({ score }: AgentPanelProps) {
     setSelectedStageId((selectedId) => selectedId === stageId ? '' : stageId)
     fingering.reset()
   }
+  const goToStage = (stage: PieceStage) => {
+    const range = buildStageLoopRange(score, stage)
+    if (range) setLoopRange(range)
+  }
   const openCreate = () => {
     setDraft({ mode: 'create', name: `方案 ${plans.length + 1}`, prompt: '' })
     setConfirmingDelete(false)
     analyzePlan.reset()
+    renamePlan.reset()
   }
   const openEdit = () => {
     if (!activePlan) return
     setDraft({
       mode: 'edit',
+      planId: activePlan.id,
       name: activePlan.name,
       prompt: activePlan.segmentationPrompt,
     })
     setConfirmingDelete(false)
     analyzePlan.reset()
+    renamePlan.reset()
   }
   const submitDraft = () => {
     if (!draft?.name.trim()) return
+    const name = draft.name.trim()
+    const prompt = draft.prompt.trim()
+    if (draft.mode === 'edit') {
+      if (!editedPlan) return
+      if (prompt === editedPlan.segmentationPrompt.trim()) {
+        if (name === editedPlan.name) {
+          setDraft(null)
+          return
+        }
+        renamePlan.mutate({ planId: editedPlan.id, name })
+        return
+      }
+    }
     analyzePlan.mutate({
-      planId: draft.mode === 'edit' ? activePlan?.id : undefined,
-      name: draft.name.trim(),
-      prompt: draft.prompt.trim(),
+      planId: draft.mode === 'edit' ? editedPlan?.id : undefined,
+      name,
+      prompt,
     })
   }
 
-  const busy = analyzePlan.isPending || activatePlan.isPending || deletePlan.isPending
+  const busy = analyzePlan.isPending
+    || renamePlan.isPending
+    || activatePlan.isPending
+    || deletePlan.isPending
   const error = analyzePlan.error
+    ?? renamePlan.error
     ?? activatePlan.error
     ?? deletePlan.error
     ?? plansQuery.error
@@ -208,8 +256,9 @@ export function AgentPanel({ score }: AgentPanelProps) {
         {draft ? (
           <PlanEditor
             draft={draft}
-            plan={draft.mode === 'edit' ? activePlan : null}
-            pending={analyzePlan.isPending}
+            plan={editedPlan}
+            submitting={analyzePlan.isPending || renamePlan.isPending}
+            analyzing={analyzePlan.isPending}
             deleting={deletePlan.isPending}
             confirmingDelete={confirmingDelete}
             onChange={setDraft}
@@ -219,7 +268,7 @@ export function AgentPanel({ score }: AgentPanelProps) {
               setConfirmingDelete(false)
             }}
             onRequestDelete={() => setConfirmingDelete(true)}
-            onDelete={() => activePlan && deletePlan.mutate(activePlan.id)}
+            onDelete={() => editedPlan && deletePlan.mutate(editedPlan.id)}
           />
         ) : null}
 
@@ -233,6 +282,7 @@ export function AgentPanel({ score }: AgentPanelProps) {
           disabled={busy}
           onCreate={openCreate}
           onSelectStage={selectStageById}
+          onGoToStage={goToStage}
           onGenerate={() => activePlan && selectedStage && fingering.mutate({
             planId: activePlan.id,
             stageId: selectedStage.id,
@@ -268,7 +318,8 @@ function IconAction({
 function PlanEditor({
   draft,
   plan,
-  pending,
+  submitting,
+  analyzing,
   deleting,
   confirmingDelete,
   onChange,
@@ -279,7 +330,8 @@ function PlanEditor({
 }: {
   draft: PlanDraft
   plan: PieceStagePlan | null
-  pending: boolean
+  submitting: boolean
+  analyzing: boolean
   deleting: boolean
   confirmingDelete: boolean
   onChange: (draft: PlanDraft) => void
@@ -288,18 +340,23 @@ function PlanEditor({
   onRequestDelete: () => void
   onDelete: () => void
 }) {
+  const promptChanged = draft.mode === 'create'
+    || draft.prompt.trim() !== plan?.segmentationPrompt.trim()
+
   return (
     <section aria-labelledby="plan-editor-title" className="border-b border-border bg-accent/20">
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <div>
           <p className="text-[8px] font-bold tracking-[0.2em] text-muted-foreground">
-            {draft.mode === 'create' ? '新建方案' : `G${plan?.generation ?? 1} · 重新生成`}
+            {draft.mode === 'create'
+              ? '新建方案'
+              : `G${plan?.generation ?? 1} · ${promptChanged ? '重新生成' : '编辑方案'}`}
           </p>
           <h3 id="plan-editor-title" className="mt-0.5 text-[11px] font-bold text-foreground">
             {draft.mode === 'create' ? '分段方案配置' : plan?.name}
           </h3>
         </div>
-        <IconAction label="关闭方案编辑" onClick={onCancel} disabled={pending || deleting}>
+        <IconAction label="关闭方案编辑" onClick={onCancel} disabled={submitting || deleting}>
           <X className="size-3.5" />
         </IconAction>
       </div>
@@ -310,7 +367,7 @@ function PlanEditor({
           <input
             value={draft.name}
             maxLength={40}
-            disabled={pending || deleting}
+            disabled={submitting || deleting}
             onChange={(event) => onChange({ ...draft, name: event.target.value })}
             className="h-9 w-full border border-border bg-background px-3 text-xs text-foreground outline-none transition focus:border-primary"
           />
@@ -321,7 +378,7 @@ function PlanEditor({
             value={draft.prompt}
             rows={4}
             maxLength={1000}
-            disabled={pending || deleting}
+            disabled={submitting || deleting}
             placeholder="例如：优先按照节奏型变化分段"
             onChange={(event) => onChange({ ...draft, prompt: event.target.value })}
             className="w-full resize-none border border-border bg-background px-3 py-2 text-[11px] leading-5 text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary"
@@ -333,7 +390,7 @@ function PlanEditor({
             confirmingDelete ? (
               <button
                 type="button"
-                disabled={pending || deleting}
+                disabled={submitting || deleting}
                 onClick={onDelete}
                 className="inline-flex h-8 items-center gap-1.5 border border-destructive px-2.5 text-[9px] font-bold text-destructive outline-none transition hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-2 focus-visible:ring-destructive disabled:opacity-40"
               >
@@ -341,19 +398,27 @@ function PlanEditor({
                 确认删除
               </button>
             ) : (
-              <IconAction label="删除当前方案" disabled={pending} onClick={onRequestDelete}>
+              <IconAction label="删除当前方案" disabled={submitting} onClick={onRequestDelete}>
                 <Trash2 className="size-3.5" />
               </IconAction>
             )
           ) : null}
           <button
             type="button"
-            disabled={!draft.name.trim() || pending || deleting}
+            disabled={!draft.name.trim() || submitting || deleting}
             onClick={onSubmit}
             className="ml-auto inline-flex h-8 items-center gap-2 bg-foreground px-3 text-[9px] font-bold text-background outline-none transition hover:bg-foreground/85 focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40"
           >
-            {pending ? <LoaderCircle className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
-            {pending ? '正在分析' : draft.mode === 'create' ? '创建并分析' : '更新并分析'}
+            {submitting
+              ? <LoaderCircle className="size-3 animate-spin" />
+              : promptChanged
+                ? <Sparkles className="size-3" />
+                : <Check className="size-3" />}
+            {submitting
+              ? analyzing ? '正在分析' : '正在保存'
+              : draft.mode === 'create'
+                ? '创建并分析'
+                : promptChanged ? '更新并分析' : '保存名称'}
           </button>
         </div>
       </div>
@@ -369,6 +434,7 @@ function StageList({
   disabled,
   onCreate,
   onSelectStage,
+  onGoToStage,
   onGenerate,
 }: {
   plan: PieceStagePlan | null
@@ -378,6 +444,7 @@ function StageList({
   disabled: boolean
   onCreate: () => void
   onSelectStage: (stageId: string) => void
+  onGoToStage: (stage: PieceStage) => void
   onGenerate: () => void
 }) {
   if (loading) {
@@ -447,6 +514,7 @@ function StageList({
                   stage={stage}
                   stageNumber={index + 1}
                   generation={generation}
+                  onGo={() => onGoToStage(stage)}
                   onGenerate={onGenerate}
                 />
               ) : null}
@@ -462,11 +530,13 @@ function StageFingeringPanel({
   stage,
   stageNumber,
   generation,
+  onGo,
   onGenerate,
 }: {
   stage: PieceStage
   stageNumber: number
   generation: UseMutationResult<FingeringPatch, Error, FingeringTarget>
+  onGo: () => void
   onGenerate: () => void
 }) {
   return (
@@ -496,15 +566,27 @@ function StageFingeringPanel({
         </p>
       </div>
 
-      <button
-        type="button"
-        disabled={generation.isPending}
-        onClick={onGenerate}
-        className="mt-4 flex h-10 w-full items-center justify-center gap-2 bg-foreground px-4 text-[10px] font-bold text-background outline-none transition hover:bg-foreground/85 focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40"
-      >
-        {generation.isPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-        {generation.isPending ? '正在生成' : '生成或更新本段指法'}
-      </button>
+      <div className="mt-4 grid grid-cols-[3.5rem_minmax(0,1fr)] gap-2">
+        <button
+          type="button"
+          onClick={onGo}
+          aria-label={`将循环范围设置为第 ${stage.startMeasure} 至 ${stage.endMeasure} 小节`}
+          title="将训练循环定位到本段"
+          className="flex h-10 items-center justify-center gap-1 border border-border text-[9px] font-bold text-muted-foreground outline-none transition hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          GO
+          <ArrowRight className="size-3" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          disabled={generation.isPending}
+          onClick={onGenerate}
+          className="flex h-10 min-w-0 items-center justify-center gap-2 bg-foreground px-4 text-[10px] font-bold text-background outline-none transition hover:bg-foreground/85 focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40"
+        >
+          {generation.isPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+          {generation.isPending ? '正在生成' : '生成或更新本段指法'}
+        </button>
+      </div>
 
       {generation.data ? (
         <p className="mt-3 flex items-center gap-2 border-l-2 border-primary bg-primary/5 px-3 py-2 text-[10px] text-foreground/75">
@@ -532,6 +614,20 @@ function selectStage(
 ) {
   if (!plan?.stages.length) return null
   return plan.stages.find((stage) => stage.id === selectedStageId) ?? null
+}
+
+function buildStageLoopRange(score: PieceScore | undefined, stage: PieceStage): LoopRange | null {
+  if (!score || score.totalBeats <= 0) return null
+  const measures = buildMeasureTimings(score.totalBeats, score.timeSignature)
+  const start = measures[stage.startMeasure - 1]
+  const end = measures[stage.endMeasure - 1]
+  if (!start || !end) return null
+  return {
+    startBeat: start.startBeat,
+    endBeat: end.startBeat + end.durationBeats,
+    startMeasure: start.number,
+    endMeasure: end.number,
+  }
 }
 
 function errorMessage(error: unknown) {

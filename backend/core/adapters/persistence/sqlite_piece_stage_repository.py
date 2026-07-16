@@ -103,6 +103,15 @@ class SqlitePieceStageRepository:
             )
             self._insert_stages(connection, plan)
 
+    def rename(self, plan_id: str, arrangement_id: str, name: str) -> None:
+        with self._lock, self._connect() as connection:
+            cursor = connection.execute(
+                "update piece_stage_plans set name = ? where id = ? and arrangement_id = ?",
+                (name, plan_id, arrangement_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError("piece stage plan not found")
+
     def delete(self, plan_id: str, arrangement_id: str) -> bool:
         with self._lock, self._connect() as connection:
             row = connection.execute(
