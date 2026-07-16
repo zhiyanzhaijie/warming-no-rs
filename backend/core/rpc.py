@@ -3,6 +3,12 @@ import sys
 from typing import Any
 
 from core.app.app_error import AppError
+from core.app.fingering import GenerateFingeringCommand
+from core.app.piece_stages import (
+    ActivatePieceStagePlanCommand,
+    AnalyzePieceStagesCommand,
+    DeletePieceStagePlanCommand,
+)
 from core.domain.music import MusicPiece, MusicPieceId
 from core.infra.setup import init_app_container
 
@@ -46,6 +52,72 @@ def dispatch(method: str, params: dict[str, Any]) -> Any:
         if piece is None:
             raise AppError.not_found("piece not found")
         return piece_score_response(piece)
+    if method == "music_generate_fingering":
+        patch = container.fingering.command.generate(GenerateFingeringCommand(
+            piece_id=MusicPieceId.parse(params["piece_id"]),
+            plan_id=str(params["plan_id"]),
+            stage_id=str(params["stage_id"]),
+        ))
+        return fingering_patch_response(patch)
+    if method == "llm_get_settings":
+        return llm_settings_response(
+            container.agent.llm_settings.get(),
+            container.agent.llm_settings.has_api_key(),
+        )
+    if method == "llm_save_settings":
+        settings = container.agent.llm_settings.save(
+            base_url=str(params["base_url"]),
+            model=str(params["model"]),
+            api_key=str(params.get("api_key", "")),
+        )
+        return llm_settings_response(
+            settings,
+            container.agent.llm_settings.has_api_key(),
+        )
+    if method == "llm_clear_api_key":
+        container.agent.llm_settings.clear_api_key()
+        return {"apiKeyConfigured": False}
+    if method == "llm_test_connection":
+        result = container.agent.llm_settings.test_connection(
+            base_url=str(params["base_url"]),
+            model=str(params["model"]),
+            api_key=str(params["api_key"]),
+        )
+        return {
+            "connected": True,
+            "model": result.model,
+            "latencyMs": result.latency_ms,
+        }
+    if method == "music_get_stage_plan":
+        plan = container.agent.piece_stages.get(
+            MusicPieceId.parse(params["piece_id"])
+        )
+        return piece_stage_plan_response(plan)
+    if method == "music_list_stage_plans":
+        plans = container.agent.piece_stages.list(
+            MusicPieceId.parse(params["piece_id"])
+        )
+        return [piece_stage_plan_response(plan) for plan in plans]
+    if method == "music_analyze_stages":
+        plan = container.agent.piece_stages.analyze(AnalyzePieceStagesCommand(
+            piece_id=MusicPieceId.parse(params["piece_id"]),
+            plan_id=str(params["plan_id"]) if params.get("plan_id") else None,
+            name=str(params["name"]) if params.get("name") is not None else None,
+            prompt=str(params["prompt"]) if params.get("prompt") is not None else None,
+        ))
+        return piece_stage_plan_response(plan)
+    if method == "music_activate_stage_plan":
+        plan = container.agent.piece_stages.activate(ActivatePieceStagePlanCommand(
+            piece_id=MusicPieceId.parse(params["piece_id"]),
+            plan_id=str(params["plan_id"]),
+        ))
+        return piece_stage_plan_response(plan)
+    if method == "music_delete_stage_plan":
+        deleted = container.agent.piece_stages.delete(DeletePieceStagePlanCommand(
+            piece_id=MusicPieceId.parse(params["piece_id"]),
+            plan_id=str(params["plan_id"]),
+        ))
+        return {"deleted": deleted}
     if method == "music_delete_piece":
         container.music.command.delete_piece(MusicPieceId.parse(params["piece_id"]))
         return {"deleted": True}
@@ -103,6 +175,20 @@ def piece_score_response(piece: MusicPiece) -> dict[str, Any]:
         (note.start_beats + note.duration_beats for note in notes),
         default=0,
     )
+    active_plan = (
+        container.agent.piece_stages.get(piece.id)
+        if arrangement else None
+    )
+    annotations = {
+        annotation.note_id: annotation
+        for annotation in (
+            container.fingering.query.list_for_plan(
+                active_plan.id,
+                arrangement.fingerprint,
+            )
+            if arrangement and active_plan else []
+        )
+    }
     return {
         "pieceId": piece.id.value,
         "title": piece.title,
@@ -124,8 +210,76 @@ def piece_score_response(piece: MusicPiece) -> dict[str, Any]:
                 "channel": note.channel,
                 "hand": note.hand,
                 "handConfidence": note.hand_confidence,
+                "fingering": (
+                    annotations[note.id].label if note.id in annotations else None
+                ),
+                "fingeringSource": (
+                    annotations[note.id].source if note.id in annotations else None
+                ),
+                "fingeringConfidence": (
+                    annotations[note.id].confidence if note.id in annotations else None
+                ),
             }
             for index, note in enumerate(notes)
+        ],
+    }
+
+
+def fingering_patch_response(patch: Any) -> dict[str, Any]:
+    return {
+        "planId": patch.plan_id,
+        "stageId": patch.stage_id,
+        "arrangementId": patch.arrangement_id,
+        "startMeasure": patch.start_measure,
+        "endMeasure": patch.end_measure,
+        "updatedCount": len(patch.annotations),
+        "warnings": list(patch.warnings),
+        "annotations": [
+            {
+                "noteId": annotation.note_id,
+                "hand": annotation.hand,
+                "finger": annotation.finger,
+                "label": annotation.label,
+                "confidence": annotation.confidence,
+            }
+            for annotation in patch.annotations
+        ],
+    }
+
+
+def llm_settings_response(
+    settings: Any,
+    api_key_configured: bool,
+) -> dict[str, Any]:
+    return {
+        "baseUrl": settings.base_url,
+        "model": settings.model,
+        "updatedAt": settings.updated_at,
+        "apiKeyConfigured": api_key_configured,
+    }
+
+
+def piece_stage_plan_response(plan: Any) -> dict[str, Any] | None:
+    if plan is None:
+        return None
+    return {
+        "id": plan.id,
+        "arrangementId": plan.arrangement_id,
+        "name": plan.name,
+        "segmentationPrompt": plan.segmentation_prompt,
+        "model": plan.model,
+        "generation": plan.generation,
+        "isActive": plan.is_active,
+        "analyzedAt": plan.analyzed_at,
+        "stages": [
+            {
+                "id": stage.id,
+                "startMeasure": stage.start_measure,
+                "endMeasure": stage.end_measure,
+                "label": stage.label,
+                "reason": stage.reason,
+            }
+            for stage in plan.stages
         ],
     }
 

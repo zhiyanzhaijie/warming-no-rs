@@ -10,7 +10,11 @@ pub struct MidiInputDevice {
 }
 
 #[derive(Clone, Debug, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 enum MidiInputEvent {
     NoteOn {
         source_id: String,

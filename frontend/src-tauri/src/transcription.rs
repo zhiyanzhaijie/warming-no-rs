@@ -244,13 +244,7 @@ pub async fn generate_midi(
     *task_handle.lock().unwrap_or_else(|lock| lock.into_inner()) = snapshot.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
-        run_transcription(
-            command,
-            input,
-            output,
-            task_handle,
-            cancel_requested,
-        )
+        run_transcription(command, input, output, task_handle, cancel_requested)
     });
     Ok(Some(snapshot))
 }
@@ -347,11 +341,7 @@ fn run_transcription(
                     push_log(&task, "MIDI 文件已生成".to_string());
                     finish_task(&task, TranscriptionTaskStatus::Succeeded, None);
                 }
-                Err(error) => finish_task(
-                    &task,
-                    TranscriptionTaskStatus::Failed,
-                    Some(error),
-                ),
+                Err(error) => finish_task(&task, TranscriptionTaskStatus::Failed, Some(error)),
             }
         }
         Ok(status) if status.success() => finish_task(

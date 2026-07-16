@@ -36,6 +36,12 @@ pub fn call(method: &str, params: Value) -> Result<Value, String> {
     sidecar.call(method, params)
 }
 
+pub async fn call_async(method: &'static str, params: Value) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || call(method, params))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 struct PythonSidecar {
     child: Option<Child>,
     stdin: Option<ChildStdin>,
@@ -154,43 +160,60 @@ fn find_backend_dir() -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-pub fn music_list_pieces() -> Result<Value, String> {
-    call("music_list_pieces", json!({}))
+pub async fn music_list_pieces() -> Result<Value, String> {
+    call_async("music_list_pieces", json!({})).await
 }
 
 #[tauri::command]
-pub fn music_get_piece(piece_id: String) -> Result<Value, String> {
-    call("music_get_piece", json!({ "piece_id": piece_id }))
+pub async fn music_get_piece(piece_id: String) -> Result<Value, String> {
+    call_async("music_get_piece", json!({ "piece_id": piece_id })).await
 }
 
 #[tauri::command]
-pub fn music_get_piece_score(piece_id: String) -> Result<Value, String> {
-    call("music_get_piece_score", json!({ "piece_id": piece_id }))
+pub async fn music_get_piece_score(piece_id: String) -> Result<Value, String> {
+    call_async("music_get_piece_score", json!({ "piece_id": piece_id })).await
 }
 
 #[tauri::command]
-pub fn music_delete_piece(piece_id: String) -> Result<Value, String> {
-    call("music_delete_piece", json!({ "piece_id": piece_id }))
+pub async fn music_generate_fingering(
+    piece_id: String,
+    plan_id: String,
+    stage_id: String,
+) -> Result<Value, String> {
+    call_async(
+        "music_generate_fingering",
+        json!({
+            "piece_id": piece_id,
+            "plan_id": plan_id,
+            "stage_id": stage_id,
+        }),
+    )
+    .await
 }
 
 #[tauri::command]
-pub fn music_list_watch_paths() -> Result<Value, String> {
-    call("music_list_watch_paths", json!({}))
+pub async fn music_delete_piece(piece_id: String) -> Result<Value, String> {
+    call_async("music_delete_piece", json!({ "piece_id": piece_id })).await
 }
 
 #[tauri::command]
-pub fn music_add_watch_path(path: String) -> Result<Value, String> {
-    call("music_add_watch_path", json!({ "path": path }))
+pub async fn music_list_watch_paths() -> Result<Value, String> {
+    call_async("music_list_watch_paths", json!({})).await
 }
 
 #[tauri::command]
-pub fn music_add_watch_paths(paths: Vec<String>) -> Result<Value, String> {
-    call("music_add_watch_paths", json!({ "paths": paths }))
+pub async fn music_add_watch_path(path: String) -> Result<Value, String> {
+    call_async("music_add_watch_path", json!({ "path": path })).await
 }
 
 #[tauri::command]
-pub fn music_refresh_library() -> Result<Value, String> {
-    call("music_refresh_library", json!({}))
+pub async fn music_add_watch_paths(paths: Vec<String>) -> Result<Value, String> {
+    call_async("music_add_watch_paths", json!({ "paths": paths })).await
+}
+
+#[tauri::command]
+pub async fn music_refresh_library() -> Result<Value, String> {
+    call_async("music_refresh_library", json!({})).await
 }
 
 #[tauri::command]

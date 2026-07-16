@@ -312,6 +312,7 @@ html:active-view-transition .route-fallback-enter {
   ::view-transition-new(route-content) {
     animation: none;
   }
+
 }
 
 @keyframes workshop-progress {

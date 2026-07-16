@@ -135,7 +135,7 @@ export function PracticePage() {
                   <SheetDescription className="text-xs text-muted-foreground">练习辅助与音准节拍诊断</SheetDescription>
                 </SheetHeader>
                 <div className="min-h-0 flex-1 overflow-y-auto p-6">
-                  <AgentPanel />
+                  <AgentPanel score={score} />
                 </div>
               </SheetContent>
             </Sheet>

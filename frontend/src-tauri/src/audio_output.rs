@@ -59,7 +59,15 @@ impl AudioOutput {
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         thread::Builder::new()
             .name("soundfont-audio".to_string())
-            .spawn(move || run_audio_thread(&soundfont_path, event_rx, computer_event_rx, input_event_rx, ready_tx))
+            .spawn(move || {
+                run_audio_thread(
+                    &soundfont_path,
+                    event_rx,
+                    computer_event_rx,
+                    input_event_rx,
+                    ready_tx,
+                )
+            })
             .ok();
 
         match ready_rx.recv_timeout(Duration::from_secs(15)) {
@@ -85,19 +93,29 @@ impl AudioOutput {
     }
 
     fn send_input(&self, events: Vec<MidiEvent>) -> Result<(), String> {
-        let sender = self.input_sender.as_ref().ok_or_else(|| self.detail.clone())?;
+        let sender = self
+            .input_sender
+            .as_ref()
+            .ok_or_else(|| self.detail.clone())?;
         for event in events {
             validate_event(&event)?;
-            sender.send(event).map_err(|_| "音频线程已停止。".to_string())?;
+            sender
+                .send(event)
+                .map_err(|_| "音频线程已停止。".to_string())?;
         }
         Ok(())
     }
 
     fn send_computer_input(&self, events: Vec<MidiEvent>) -> Result<(), String> {
-        let sender = self.computer_sender.as_ref().ok_or_else(|| self.detail.clone())?;
+        let sender = self
+            .computer_sender
+            .as_ref()
+            .ok_or_else(|| self.detail.clone())?;
         for event in events {
             validate_event(&event)?;
-            sender.send(event).map_err(|_| "音频线程已停止。".to_string())?;
+            sender
+                .send(event)
+                .map_err(|_| "音频线程已停止。".to_string())?;
         }
         Ok(())
     }
@@ -206,16 +224,86 @@ fn create_stream(
     let config: cpal::StreamConfig = supported.into();
 
     match sample_format {
-        cpal::SampleFormat::I8 => build_stream::<i8>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
-        cpal::SampleFormat::I16 => build_stream::<i16>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
-        cpal::SampleFormat::I32 => build_stream::<i32>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
-        cpal::SampleFormat::I64 => build_stream::<i64>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
-        cpal::SampleFormat::U8 => build_stream::<u8>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
-        cpal::SampleFormat::U16 => build_stream::<u16>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
-        cpal::SampleFormat::U32 => build_stream::<u32>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
-        cpal::SampleFormat::U64 => build_stream::<u64>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
-        cpal::SampleFormat::F32 => build_stream::<f32>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
-        cpal::SampleFormat::F64 => build_stream::<f64>(&device, &config, soundfont_path, event_rx, computer_event_rx, input_event_rx),
+        cpal::SampleFormat::I8 => build_stream::<i8>(
+            &device,
+            &config,
+            soundfont_path,
+            event_rx,
+            computer_event_rx,
+            input_event_rx,
+        ),
+        cpal::SampleFormat::I16 => build_stream::<i16>(
+            &device,
+            &config,
+            soundfont_path,
+            event_rx,
+            computer_event_rx,
+            input_event_rx,
+        ),
+        cpal::SampleFormat::I32 => build_stream::<i32>(
+            &device,
+            &config,
+            soundfont_path,
+            event_rx,
+            computer_event_rx,
+            input_event_rx,
+        ),
+        cpal::SampleFormat::I64 => build_stream::<i64>(
+            &device,
+            &config,
+            soundfont_path,
+            event_rx,
+            computer_event_rx,
+            input_event_rx,
+        ),
+        cpal::SampleFormat::U8 => build_stream::<u8>(
+            &device,
+            &config,
+            soundfont_path,
+            event_rx,
+            computer_event_rx,
+            input_event_rx,
+        ),
+        cpal::SampleFormat::U16 => build_stream::<u16>(
+            &device,
+            &config,
+            soundfont_path,
+            event_rx,
+            computer_event_rx,
+            input_event_rx,
+        ),
+        cpal::SampleFormat::U32 => build_stream::<u32>(
+            &device,
+            &config,
+            soundfont_path,
+            event_rx,
+            computer_event_rx,
+            input_event_rx,
+        ),
+        cpal::SampleFormat::U64 => build_stream::<u64>(
+            &device,
+            &config,
+            soundfont_path,
+            event_rx,
+            computer_event_rx,
+            input_event_rx,
+        ),
+        cpal::SampleFormat::F32 => build_stream::<f32>(
+            &device,
+            &config,
+            soundfont_path,
+            event_rx,
+            computer_event_rx,
+            input_event_rx,
+        ),
+        cpal::SampleFormat::F64 => build_stream::<f64>(
+            &device,
+            &config,
+            soundfont_path,
+            event_rx,
+            computer_event_rx,
+            input_event_rx,
+        ),
         format => Err(format!("暂不支持音频采样格式：{format}")),
     }
 }
@@ -297,8 +385,8 @@ fn create_synth(
         ..Default::default()
     })
     .map_err(|error| format!("无法创建 SoundFont 合成器：{error}"))?;
-    let mut file = File::open(soundfont_path)
-        .map_err(|error| format!("无法打开默认 SoundFont：{error}"))?;
+    let mut file =
+        File::open(soundfont_path).map_err(|error| format!("无法打开默认 SoundFont：{error}"))?;
     let font = oxisynth::SoundFont::load(&mut file)
         .map_err(|error| format!("无法解析默认 SoundFont：{error}"))?;
     synth.add_font(font, true);

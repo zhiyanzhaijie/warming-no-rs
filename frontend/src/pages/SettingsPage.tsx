@@ -1,5 +1,13 @@
-import { Bot, Database, FolderCog, Globe2, HardDrive, Languages, Laptop, Moon, ShieldCheck, Sun } from 'lucide-react'
+import { Bot, Database, FolderCog, HardDrive, Languages, Laptop, Moon, Palette, Piano, ShieldCheck, Sun } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 import { InputDeviceControl } from '../features/instrument/input/InputDeviceControl'
+import { LlmSettingsPanel } from '../features/settings/LlmSettingsPanel'
 import { useThemeStore, type ThemePreference } from '../features/settings/themeStore'
 import { cn } from '@/lib/utils'
 
@@ -18,8 +26,8 @@ const localRuntime = [
   },
   {
     label: '智能服务',
-    value: 'Remote API for MVP',
-    detail: '练习分析通道',
+    value: 'OpenAI Compatible',
+    detail: 'DeepSeek 优先配置',
     icon: Bot,
   },
 ]
@@ -50,14 +58,58 @@ export function SettingsPage() {
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_19rem] max-[920px]:grid-cols-1 max-[920px]:overflow-y-auto">
-        <main className="min-h-0 min-w-0 overflow-y-auto max-[920px]:min-h-[760px]">
-          <div className="min-h-[520px] border-b border-border">
-            <InputDeviceControl />
-          </div>
-          <PreferencesPanel
-            themePreference={themePreference}
-            onThemeChange={setThemePreference}
-          />
+        <main className="min-h-0 min-w-0 overflow-y-auto max-[920px]:overflow-visible">
+          <Accordion type="multiple" defaultValue={['llm']}>
+            <AccordionItem value="llm">
+              <AccordionTrigger>
+                <SettingsSectionTitle
+                  index="01"
+                  icon={Bot}
+                  title="模型服务"
+                  detail="DeepSeek 与 OpenAI Compatible"
+                  status="智能服务"
+                />
+              </AccordionTrigger>
+              <AccordionContent>
+                <LlmSettingsPanel />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="input">
+              <AccordionTrigger>
+                <SettingsSectionTitle
+                  index="02"
+                  icon={Piano}
+                  title="钢琴输入"
+                  detail="输入设备、连接状态与键盘范围"
+                  status="全局输入"
+                />
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="min-h-[460px]">
+                  <InputDeviceControl showHeader={false} />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="preferences">
+              <AccordionTrigger>
+                <SettingsSectionTitle
+                  index="03"
+                  icon={Palette}
+                  title="主题与语言"
+                  detail="界面主题和本地语言偏好"
+                  status="本机偏好"
+                />
+              </AccordionTrigger>
+              <AccordionContent>
+                <PreferencesPanel
+                  themePreference={themePreference}
+                  onThemeChange={setThemePreference}
+                />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </main>
 
         <aside className="flex min-h-0 flex-col border-l border-border max-[920px]:border-l-0 max-[920px]:border-t">
@@ -100,6 +152,38 @@ const themeOptions: Array<{ value: ThemePreference; label: string; icon: typeof 
   { value: 'dark', label: '深色', icon: Moon },
 ]
 
+function SettingsSectionTitle({
+  index,
+  icon: Icon,
+  title,
+  detail,
+  status,
+}: {
+  index: string
+  icon: LucideIcon
+  title: string
+  detail: string
+  status: string
+}) {
+  return (
+    <span className="flex min-w-0 flex-1 items-center gap-4">
+      <span className="grid size-9 shrink-0 place-items-center border border-border text-muted-foreground transition group-data-[state=open]:border-primary/55 group-data-[state=open]:text-primary">
+        <Icon className="size-4" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-3">
+          <span className="text-[9px] font-bold tabular-nums text-muted-foreground">{index}</span>
+          <span className="font-title text-sm font-bold text-foreground/90">{title}</span>
+        </span>
+        <span className="mt-1 block truncate text-[10px] text-muted-foreground">{detail}</span>
+      </span>
+      <span className="shrink-0 text-[9px] font-bold tracking-[0.18em] text-muted-foreground group-data-[state=open]:text-primary max-[560px]:hidden">
+        {status}
+      </span>
+    </span>
+  )
+}
+
 function PreferencesPanel({
   themePreference,
   onThemeChange,
@@ -108,18 +192,8 @@ function PreferencesPanel({
   onThemeChange: (preference: ThemePreference) => void
 }) {
   return (
-    <section aria-labelledby="preference-title" className="px-8 py-7 max-[720px]:px-5">
-      <div className="flex items-start gap-4">
-        <div className="grid size-10 shrink-0 place-items-center border border-border text-muted-foreground">
-          <Globe2 className="size-4" />
-        </div>
-        <div>
-          <h2 id="preference-title" className="font-title text-base font-bold text-foreground/90">主题与语言</h2>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">设置应用外观与界面语言偏好。</p>
-        </div>
-      </div>
-
-      <div className="mt-6 grid max-w-2xl gap-5">
+    <section aria-label="主题与语言设置" className="px-8 py-7 max-[720px]:px-5">
+      <div className="grid max-w-2xl gap-5">
         <fieldset>
           <legend className="text-[9px] font-bold tracking-[0.28em] text-muted-foreground">主题偏好</legend>
           <div className="mt-2 grid grid-cols-3 gap-px border border-border bg-border max-[520px]:grid-cols-1">

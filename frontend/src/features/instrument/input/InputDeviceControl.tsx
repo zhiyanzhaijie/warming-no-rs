@@ -13,7 +13,7 @@ import { connectMidiInput, disconnectMidiInput } from './midiInputApi'
 import { useInstrumentStore } from './instrumentStore'
 import { pianoInputBus } from './PianoInputBus'
 
-export function InputDeviceControl() {
+export function InputDeviceControl({ showHeader = true }: { showHeader?: boolean }) {
   const devices = useInstrumentStore((state) => state.devices)
   const activeDeviceId = useInstrumentStore((state) => state.activeDeviceId)
   const status = useInstrumentStore((state) => state.status)
@@ -87,25 +87,27 @@ export function InputDeviceControl() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <section className="flex shrink-0 items-start gap-4 border-b border-border px-8 py-6 max-[720px]:px-5">
-        <div className="grid size-10 shrink-0 place-items-center border border-primary/50 text-primary">
-          <Icon className="size-4.5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <h2 className="font-title text-base font-bold text-foreground/90">钢琴输入设备</h2>
-            <span className={cn(
-              'text-[9px] font-bold tracking-[0.22em]',
-              status === 'error' ? 'text-destructive' : 'text-primary',
-            )}>
-              {connectionLabel}
-            </span>
+      {showHeader ? (
+        <section className="flex shrink-0 items-start gap-4 border-b border-border px-8 py-6 max-[720px]:px-5">
+          <div className="grid size-10 shrink-0 place-items-center border border-primary/50 text-primary">
+            <Icon className="size-4.5" />
           </div>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            全局输入源，选择后直接用于自由演奏与全部练习模式。
-          </p>
-        </div>
-      </section>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <h2 className="font-title text-base font-bold text-foreground/90">钢琴输入设备</h2>
+              <span className={cn(
+                'text-[9px] font-bold tracking-[0.22em]',
+                status === 'error' ? 'text-destructive' : 'text-primary',
+              )}>
+                {connectionLabel}
+              </span>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              全局输入源，选择后直接用于自由演奏与全部练习模式。
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid shrink-0 grid-cols-[minmax(0,1fr)_12rem] gap-8 border-b border-border px-8 py-6 max-[720px]:grid-cols-1 max-[720px]:gap-4 max-[720px]:px-5">
         <div className="min-w-0">

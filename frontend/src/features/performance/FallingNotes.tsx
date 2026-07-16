@@ -416,9 +416,18 @@ export function FallingNotes({ score }: FallingNotesProps) {
             {preparedNotes.map((note) => (
               <div
                 key={note.id}
-                className={cn('absolute', note.colorClassName)}
+                className={cn(
+                  'absolute grid overflow-hidden text-primary-foreground',
+                  note.colorClassName,
+                )}
                 style={initialNoteStyle(note, renderStartBeat, pixelsPerBeat)}
-              />
+              >
+                {note.fingering && note.height >= 13 ? (
+                  <span className="self-end justify-self-center pb-1 text-[8px] font-black leading-none tabular-nums drop-shadow-sm">
+                    {note.fingering}
+                  </span>
+                ) : null}
+              </div>
             ))}
           </div>
         </div>

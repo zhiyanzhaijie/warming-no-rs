@@ -1,4 +1,5 @@
 mod audio_output;
+mod llm_settings;
 mod midi_input;
 mod python_sidecar;
 mod transcription;
@@ -32,12 +33,22 @@ pub fn run() {
             python_sidecar::music_list_pieces,
             python_sidecar::music_get_piece,
             python_sidecar::music_get_piece_score,
+            python_sidecar::music_generate_fingering,
             python_sidecar::music_delete_piece,
             python_sidecar::music_list_watch_paths,
             python_sidecar::music_add_watch_path,
             python_sidecar::music_add_watch_paths,
             python_sidecar::music_refresh_library,
             python_sidecar::select_midi_watch_directories,
+            llm_settings::llm_get_settings,
+            llm_settings::llm_save_settings,
+            llm_settings::llm_clear_api_key,
+            llm_settings::llm_test_connection,
+            llm_settings::music_get_stage_plan,
+            llm_settings::music_list_stage_plans,
+            llm_settings::music_analyze_stages,
+            llm_settings::music_activate_stage_plan,
+            llm_settings::music_delete_stage_plan,
             transcription::check_transkun,
             transcription::select_audio_file,
             transcription::get_transcription_task,
