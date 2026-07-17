@@ -451,11 +451,11 @@ function ProcessingActionFooter({
             <FileMusic className="size-4 shrink-0" />
             <div className="min-w-0">
               <p className="text-xs font-bold tracking-wide">MIDI 已生成</p>
-              <p className="mt-1 truncate text-[10px] text-muted-foreground" title={outputPath}>{outputPath}</p>
+              <p data-selectable className="mt-1 truncate text-[10px] text-muted-foreground" title={outputPath}>{outputPath}</p>
             </div>
           </div>
         ) : message ? (
-          <p className="text-xs font-bold text-destructive">{message}</p>
+          <p data-selectable className="text-xs font-bold text-destructive">{message}</p>
         ) : (
           <div className="flex items-center gap-3 text-muted-foreground">
             <FolderOutput className="size-4 shrink-0" />
@@ -601,12 +601,12 @@ function InstallLogPanel({ task }: { task: TranskunInstallTask }) {
         </span>
         {running ? <LoaderCircle className="size-3 animate-spin text-primary" /> : null}
       </div>
-      <div className="mt-2 max-h-36 overflow-y-auto font-mono text-[10px] leading-5 text-muted-foreground">
+      <div data-selectable className="mt-2 max-h-36 overflow-y-auto font-mono text-[10px] leading-5 text-muted-foreground">
         {logs.length > 0
           ? logs.map((line, index) => <p key={`${index}-${line}`}>{line}</p>)
           : <p>等待安装输出...</p>}
       </div>
-      {task.error ? <p className="mt-2 text-[10px] leading-5 text-destructive">{task.error}</p> : null}
+      {task.error ? <p data-selectable className="mt-2 text-[10px] leading-5 text-destructive">{task.error}</p> : null}
     </div>
   )
 }

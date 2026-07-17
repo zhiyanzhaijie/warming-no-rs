@@ -5,6 +5,7 @@ import { scoreApi } from '../api/score'
 import { PieceCard } from '../features/library/PieceCard'
 import { AsciiMediaBackground } from '../components/media/AsciiMediaBackground'
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover'
+import pianoLoopUrl from '@/assets/piano-loop.mp4'
 
 export function LibraryPage() {
   const queryClient = useQueryClient()
@@ -113,7 +114,7 @@ export function LibraryPage() {
   return (
     <div className="relative flex h-full w-full overflow-hidden bg-background font-sans text-foreground/90">
       <AsciiMediaBackground
-        src="/piano-loop.mp4"
+        src={pianoLoopUrl}
         characterSet="blocks"
         cellWidth={10}
         color="currentColor"
@@ -142,8 +143,8 @@ export function LibraryPage() {
               钢琴曲库
             </h1>
             <p className="mt-5 text-sm font-medium leading-relaxed text-muted-foreground max-w-sm">
-              专为落键钢琴练习打造的个人曲库。<br />
-              导入本地 MIDI 目录，自动解析生成极简下落音符谱面。
+              用落键的方式让钢琴曲谱变得简单，<br />
+              打开 MIDI 文件, 随时随地开始练习
             </p>
           </div>
 
@@ -274,17 +275,17 @@ export function LibraryPage() {
             {pieces.length > 0 ? (
               <div className="flex flex-col gap-4">
                 {pieces.map((piece) => (
-                    <PieceCard
-                      key={piece.id}
-                      piece={piece}
-                      onRemove={requestRemove}
-                      onCancelRemove={() => setConfirmingPieceId(null)}
-                      confirmingRemove={confirmingPieceId === piece.id}
-                      removing={
-                        removePiece.isPending &&
-                        removePiece.variables?.sourcePath === piece.sourcePath
-                      }
-                    />
+                  <PieceCard
+                    key={piece.id}
+                    piece={piece}
+                    onRemove={requestRemove}
+                    onCancelRemove={() => setConfirmingPieceId(null)}
+                    confirmingRemove={confirmingPieceId === piece.id}
+                    removing={
+                      removePiece.isPending &&
+                      removePiece.variables?.sourcePath === piece.sourcePath
+                    }
+                  />
                 ))}
               </div>
             ) : (

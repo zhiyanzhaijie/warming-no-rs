@@ -1,16 +1,52 @@
 mod audio_output;
 mod llm_settings;
 mod midi_input;
+#[cfg(target_os = "macos")]
+mod macos_window;
 mod python_sidecar;
 mod transcription;
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use std::io::{Error, ErrorKind};
 use tauri::{path::BaseDirectory, Manager};
+
+#[tauri::command]
+fn set_traffic_lights_visible(
+    window: tauri::WebviewWindow,
+    visible: bool,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        return macos_window::schedule_traffic_lights_visibility(window, visible)
+            .map_err(|error| error.to_string());
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (window, visible);
+        Ok(())
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            let main_window = app.get_webview_window("main").ok_or_else(|| {
+                Error::new(ErrorKind::NotFound, "main window was not created")
+            })?;
+
+            #[cfg(target_os = "macos")]
+            macos_window::configure_traffic_lights(&main_window, true)?;
+
+            #[cfg(target_os = "windows")]
+            {
+                main_window.set_decorations(false)?;
+                main_window.set_shadow(true)?;
+            }
+
             let soundfont = app
                 .path()
                 .resolve("resources/default.sf2", BaseDirectory::Resource)
@@ -31,6 +67,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            set_traffic_lights_visible,
             python_sidecar::app_get_storage_info,
             python_sidecar::music_list_pieces,
             python_sidecar::music_get_piece,

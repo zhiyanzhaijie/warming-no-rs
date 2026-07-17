@@ -139,7 +139,7 @@ export function SettingsPage() {
                     <Icon className="size-3.5" />
                     {item.label}
                   </dt>
-                  <dd className="mt-3 break-words text-xs font-bold leading-5 text-foreground/65" title={value}>{value}</dd>
+                  <dd data-selectable className="mt-3 break-words text-xs font-bold leading-5 text-foreground/65" title={value}>{value}</dd>
                   <dd className="mt-1 text-[10px] tracking-wide text-muted-foreground">{item.detail}</dd>
                 </div>
               )

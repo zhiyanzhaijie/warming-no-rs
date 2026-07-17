@@ -1,8 +1,12 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, MouseEvent } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Keyboard, Library, Music2, Piano, Settings, WandSparkles } from 'lucide-react'
+import { Library, Music2, Settings, WandSparkles } from 'lucide-react'
 import { useInstrumentStore } from '../../features/instrument/input/instrumentStore'
 import { usePracticeStore } from '../../features/practice/practiceStore'
+import { ContentDragHandle } from './ContentDragHandle'
+import { WindowChromeSync } from './WindowChromeSync'
+import warmingLogo from '@/assets/warming.png'
+import { startDraggingWindow } from '@/desktop/window'
 import {
   Sidebar,
   SidebarContent,
@@ -17,12 +21,34 @@ import {
   SidebarProvider,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import { WindowControls } from './WindowControls'
 
 const navItems = [
   { to: '/library', label: '曲库', icon: Library },
   { to: '/processing', label: '加工', icon: WandSparkles },
   { to: '/settings', label: '设置', icon: Settings },
 ]
+
+const windowDragExclusionSelector = [
+  'a',
+  'button',
+  'input',
+  'textarea',
+  'select',
+  '[contenteditable="true"]',
+  '[data-no-window-drag]',
+].join(',')
+
+function handleSidebarMouseDown(event: MouseEvent<HTMLElement>) {
+  if (event.button !== 0 || event.defaultPrevented) return
+
+  const target = event.target
+  if (!(target instanceof Element) || target.closest(windowDragExclusionSelector)) return
+
+  void startDraggingWindow().catch((error: unknown) => {
+    console.error('Window drag failed', error)
+  })
+}
 
 export function AppShell() {
   const inputDevices = useInstrumentStore((state) => state.devices)
@@ -33,7 +59,6 @@ export function AppShell() {
   const isPlaying = usePracticeStore((state) => state.isPlaying)
   const location = useLocation()
   const activeInputDevice = inputDevices.find((device) => device.id === activeDeviceId) ?? inputDevices[0]
-  const InputIcon = activeInputDevice.kind === 'midi-keyboard' ? Piano : Keyboard
   const inputSpecification = activeInputDevice.keyCount
     ? `${activeInputDevice.keyCount} 键`
     : '音域未校准'
@@ -46,7 +71,7 @@ export function AppShell() {
       ? '连接异常'
       : activeInputDevice.kind === 'midi-keyboard'
         ? '设备在线'
-        : '本地映射'
+        : '键盘映射'
 
   return (
     <SidebarProvider
@@ -58,23 +83,26 @@ export function AppShell() {
         } as CSSProperties
       }
     >
+      <WindowChromeSync />
       <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
         <Sidebar
           collapsible="icon"
           className="border-r-0 bg-sidebar p-2 group-data-[side=left]:border-r-0 group-data-[side=right]:border-l-0"
+          onMouseDown={handleSidebarMouseDown}
         >
-          <SidebarHeader className="p-2 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-1">
-            <div className="flex min-w-0 items-center gap-3 border border-sidebar-border bg-transparent p-3 group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:p-0">
-              <span className="relative grid size-8 shrink-0 place-items-center text-sidebar-foreground/60">
-                <InputIcon className="size-4" />
-                <span
-                  className={`absolute bottom-0.5 right-0.5 size-1.5 ${inputStatus === 'error' ? 'bg-destructive' : inputStatus === 'connecting' ? 'animate-pulse bg-primary' : 'bg-primary'}`}
-                  aria-hidden="true"
+          <SidebarHeader className="p-2 group-data-[collapsible=icon]:items-center">
+            <WindowControls />
+            <div className="mt-5 flex min-w-0 items-center gap-3 bg-transparent group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center">
+              <span className="relative h-16 w-8 shrink-0 overflow-hidden bg-primary rounded-sm">
+                <img
+                  src={warmingLogo}
+                  alt="warming logo"
+                  className="absolute left-1/2 top-1/2 block h-5 w-12 max-w-none -translate-x-1/2 -translate-y-1/2 -rotate-90 object-contain"
                 />
               </span>
               <div className="min-w-0 flex-1 group-data-[collapsible=icon]:sr-only">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[9px] font-bold tracking-[0.2em] text-muted-foreground">MIDI 输入</p>
+                  <p className="text-[9px] font-bold tracking-[0.2em] text-muted-foreground">设备</p>
                   <span className={`text-[8px] font-bold tracking-wider ${inputStatus === 'error' ? 'text-destructive' : 'text-primary'}`}>
                     {inputStatusLabel}
                   </span>
@@ -135,7 +163,7 @@ export function AppShell() {
                       <span className="practice-wind practice-wind-three" />
                     </span>
                   ) : null}
-                  <Music2 className="relative z-10 size-4" />
+                  <Music2 className="relative z-10 size-7" />
                 </span>
                 <span className="min-w-0 flex-1 group-data-[collapsible=icon]:sr-only">
                   <span className="block text-[9px] font-bold tracking-[0.2em] text-muted-foreground">
@@ -152,6 +180,7 @@ export function AppShell() {
         </Sidebar>
 
         <SidebarInset className="min-w-0 overflow-hidden bg-background p-2 data-[sidebar-mode=fullscreen]:p-0">
+          <ContentDragHandle />
           <main className="route-content h-full min-h-0 min-w-0 overflow-hidden rounded-lg bg-background in-data-[sidebar-mode=fullscreen]:rounded-none">
             <div key={location.key} className="route-fallback-enter h-full min-h-0">
               <Outlet />

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Agent Piano",
+  "productName": "warming",
   "version": "0.1.0",
-  "identifier": "dev.local.agent-piano",
+  "identifier": "dev.local.warming",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,13 +12,21 @@
   "app": {
     "windows": [
       {
-        "title": "Agent Piano",
+        "title": "warming",
         "width": 1280,
         "height": 820,
-        "minWidth": 960,
+        "minWidth": 1024,
         "minHeight": 640,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "decorations": true,
+        "shadow": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 8,
+          "y": 12
+        }
       }
     ],
     "security": {
