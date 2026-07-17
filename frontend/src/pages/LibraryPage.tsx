@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { RefreshCw, Library, Info, X } from 'lucide-react'
 import { scoreApi } from '../api/score'
 import { PieceCard } from '../features/library/PieceCard'
+import { AsciiMediaBackground } from '../components/media/AsciiMediaBackground'
 
 export function LibraryPage() {
   const queryClient = useQueryClient()
@@ -98,24 +99,26 @@ export function LibraryPage() {
 
   return (
     <div className="relative flex h-full w-full overflow-hidden bg-background font-sans text-foreground/90">
-      {/* Background Video */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="pointer-events-none absolute inset-0 size-full object-cover opacity-[0.08] mix-blend-multiply dark:opacity-20 dark:mix-blend-screen"
-        src="/ascii-flower.mp4"
+      <AsciiMediaBackground
+        src="/piano-loop.mp4"
+        characterSet="blocks"
+        cellWidth={10}
+        color="currentColor"
+        dither="bayer"
+        blackPoint={0.08}
+        whitePoint={0.62}
+        gamma={0.9}
+        className="pointer-events-none absolute inset-0 size-full object-cover text-foreground dark:opacity-50 opacity-60"
       />
       {/* Elegant organic ambient radial-gradient masking */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent dark:via-background/45" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
 
       {/* Main Structural Division */}
       <div className="relative z-10 flex size-full justify-between pl-14 pr-14 xl:pl-20 xl:pr-20">
-        
+
         {/* Left Editorial Column: Left Aligned and Integrated */}
         <main className="flex h-full w-[40%] min-w-[360px] max-w-[480px] shrink-0 flex-col justify-between py-16 pr-8">
-          
+
           {/* Top Title Group */}
           <div className="flex flex-col">
             <div className="mb-4 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.4em] text-foreground/20">
@@ -203,7 +206,7 @@ export function LibraryPage() {
               {pieces.length} Pieces
             </span>
           </header>
-          
+
           <div className="flex-1 overflow-y-auto no-scrollbar pt-6">
             {pieces.length > 0 ? (
               <div className="flex flex-col gap-4">
