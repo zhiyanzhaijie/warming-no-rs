@@ -103,7 +103,7 @@ export function InputDeviceControl({ showHeader = true }: { showHeader?: boolean
               </span>
             </div>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              全局输入源，选择后直接用于自由演奏与全部练习模式。
+              选择后用于演奏和练习。
             </p>
           </div>
         </section>

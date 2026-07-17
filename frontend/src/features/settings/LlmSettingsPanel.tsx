@@ -5,7 +5,6 @@ import {
   type UseMutationResult,
 } from '@tanstack/react-query'
 import {
-  Bot,
   Check,
   Eye,
   EyeOff,
@@ -13,10 +12,10 @@ import {
   LoaderCircle,
   PlugZap,
   Save,
-  Server,
   Trash2,
 } from 'lucide-react'
-import { useRef, useState, type FormEvent, type ReactNode } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import {
   llmSettingsApi,
   type LlmConnectionResult,
@@ -39,9 +38,9 @@ export function LlmSettingsPanel() {
   })
 
   return (
-    <section aria-label="OpenAI Compatible 模型配置" className="px-8 py-7 max-[720px]:px-5">
+    <section aria-label="DeepSeek 模型配置" className="px-8 py-7 max-[720px]:px-5">
       <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border pb-4 text-[9px] font-bold text-muted-foreground">
-        <span>协议 · Chat Completions</span>
+        <span>DeepSeek</span>
         <span className={settingsQuery.data?.apiKeyConfigured ? 'text-primary' : undefined}>
           密钥 · {settingsQuery.data?.apiKeyConfigured ? '本地加密' : '未配置'}
         </span>
@@ -62,11 +61,14 @@ export function LlmSettingsPanel() {
 
 function LlmSettingsForm({ initialSettings }: { initialSettings: LlmSettings }) {
   const queryClient = useQueryClient()
-  const [baseUrl, setBaseUrl] = useState(initialSettings.baseUrl)
-  const [model, setModel] = useState(initialSettings.model)
+  const [baseUrl] = useState(deepSeekBaseUrl)
+  const [model, setModel] = useState(
+    modelPresets.some((preset) => preset.model === initialSettings.model)
+      ? initialSettings.model
+      : modelPresets[0].model,
+  )
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
-  const baseUrlInputRef = useRef<HTMLInputElement>(null)
 
   const saveMutation = useMutation({
     mutationFn: (input: LlmSettingsInput) => llmSettingsApi.save(input),
@@ -98,6 +100,13 @@ function LlmSettingsForm({ initialSettings }: { initialSettings: LlmSettings }) 
   )?.id
   const busy = saveMutation.isPending || testMutation.isPending || clearKeyMutation.isPending
 
+  const selectModel = (nextModel: string) => {
+    setModel(nextModel)
+    saveMutation.reset()
+    testMutation.reset()
+    clearKeyMutation.reset()
+  }
+
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     testMutation.reset()
@@ -120,68 +129,28 @@ function LlmSettingsForm({ initialSettings }: { initialSettings: LlmSettings }) 
   return (
     <form onSubmit={submit} className="max-w-3xl">
       <fieldset disabled={busy}>
-        <legend className="text-[9px] font-bold tracking-[0.28em] text-muted-foreground">模型预设</legend>
-        <div className="mt-2 grid grid-cols-3 gap-px border border-border bg-border max-[620px]:grid-cols-1">
+        <legend className="text-[9px] font-bold tracking-[0.28em] text-muted-foreground">模型</legend>
+        <div className="mt-2 grid grid-cols-2 gap-px border border-border bg-border max-[620px]:grid-cols-1">
           {modelPresets.map((preset) => (
             <button
               key={preset.id}
               type="button"
               aria-pressed={activePreset === preset.id}
-              onClick={() => {
-                setBaseUrl(deepSeekBaseUrl)
-                setModel(preset.model)
-              }}
+              onClick={() => selectModel(preset.model)}
               className={cn(
                 'h-11 bg-background px-3 text-[10px] font-bold outline-none transition focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary',
                 activePreset === preset.id
-                  ? 'text-primary'
+                  ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground',
               )}
             >
               {preset.label}
             </button>
           ))}
-          <button
-            type="button"
-            aria-pressed={!activePreset}
-            onClick={() => baseUrlInputRef.current?.focus()}
-            className={cn(
-              'h-11 bg-background px-3 text-[10px] font-bold outline-none transition focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary',
-              !activePreset ? 'text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-            )}
-          >
-            自定义兼容服务
-          </button>
         </div>
       </fieldset>
 
-      <div className="mt-6 grid grid-cols-2 gap-5 max-[620px]:grid-cols-1">
-        <Field label="Base URL" icon={Server}>
-          <input
-            ref={baseUrlInputRef}
-            type="url"
-            required
-            value={baseUrl}
-            onChange={(event) => setBaseUrl(event.target.value)}
-            disabled={busy}
-            spellCheck={false}
-            className="h-11 w-full border border-border bg-background px-3 text-xs text-foreground outline-none transition focus:border-primary disabled:opacity-50"
-          />
-        </Field>
-        <Field label="Model" icon={Bot}>
-          <input
-            type="text"
-            required
-            value={model}
-            onChange={(event) => setModel(event.target.value)}
-            disabled={busy}
-            spellCheck={false}
-            className="h-11 w-full border border-border bg-background px-3 text-xs text-foreground outline-none transition focus:border-primary disabled:opacity-50"
-          />
-        </Field>
-      </div>
-
-      <Field label="API Key" icon={KeyRound} className="mt-5">
+      <Field label="API Key" icon={KeyRound} className="mt-6">
         <div className="flex">
           <input
             type={showApiKey ? 'text' : 'password'}
@@ -209,7 +178,7 @@ function LlmSettingsForm({ initialSettings }: { initialSettings: LlmSettings }) 
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex h-9 items-center gap-2 border border-foreground bg-foreground px-4 text-[10px] font-bold text-background outline-none transition hover:bg-foreground/80 focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40"
+          className="inline-flex h-9 items-center gap-2 border border-primary bg-primary px-4 text-[10px] font-bold text-primary-foreground outline-none transition hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40"
         >
           {saveMutation.isPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
           保存配置
@@ -241,6 +210,7 @@ function LlmSettingsForm({ initialSettings }: { initialSettings: LlmSettings }) 
         saveMutation={saveMutation}
         testMutation={testMutation}
         clearKeyMutation={clearKeyMutation}
+        selectedModel={model}
       />
     </form>
   )
@@ -253,7 +223,7 @@ function Field({
   children,
 }: {
   label: string
-  icon: typeof Server
+  icon: LucideIcon
   className?: string
   children: ReactNode
 }) {
@@ -272,10 +242,12 @@ function MutationStatus({
   saveMutation,
   testMutation,
   clearKeyMutation,
+  selectedModel,
 }: {
   saveMutation: UseMutationResult<LlmSettings, Error, LlmSettingsInput>
   testMutation: UseMutationResult<LlmConnectionResult, Error, LlmSettingsInput>
   clearKeyMutation: UseMutationResult<{ apiKeyConfigured: boolean }, Error, void>
+  selectedModel: string
 }) {
   const error = saveMutation.error ?? testMutation.error ?? clearKeyMutation.error
   if (error) return <StatusLine tone="error" message={errorMessage(error)} />
@@ -283,7 +255,7 @@ function MutationStatus({
     return (
       <StatusLine
         tone="success"
-        message={`连接正常 · ${testMutation.data.model} · ${testMutation.data.latencyMs}ms`}
+        message={`连接正常 · 已请求 ${selectedModel} · ${testMutation.data.latencyMs}ms`}
       />
     )
   }

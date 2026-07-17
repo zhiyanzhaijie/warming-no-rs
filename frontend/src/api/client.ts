@@ -24,6 +24,9 @@ const suggestions: AgentSuggestion[] = [
 const wait = (ms = 180) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
 export const apiClient = {
+  getStorageInfo() {
+    return invoke<{ databasePath: string; dataDirectory: string }>('app_get_storage_info')
+  },
   listPieces() {
     return invoke<Piece[]>('music_list_pieces')
   },

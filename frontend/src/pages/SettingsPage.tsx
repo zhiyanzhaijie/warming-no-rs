@@ -1,5 +1,6 @@
 import { Bot, Database, FolderCog, HardDrive, Languages, Laptop, Moon, Palette, Piano, ShieldCheck, Sun } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Accordion,
   AccordionContent,
@@ -10,24 +11,24 @@ import { InputDeviceControl } from '../features/instrument/input/InputDeviceCont
 import { LlmSettingsPanel } from '../features/settings/LlmSettingsPanel'
 import { useThemeStore, type ThemePreference } from '../features/settings/themeStore'
 import { cn } from '@/lib/utils'
+import { runtimeApi } from '../api/runtime'
 
 const localRuntime = [
   {
-    label: '数据目录',
-    value: '~/Library/Application Support/Agent Piano',
-    detail: '曲库索引与本地配置',
+    label: '应用数据',
+    detail: '曲库和设置都保存在这里',
     icon: FolderCog,
   },
   {
-    label: '向量数据库',
-    value: 'sqlite-vec local index',
-    detail: '仅保存在本机',
+    label: '本地数据库',
+    value: 'SQLite',
+    detail: '只在本机使用',
     icon: Database,
   },
   {
-    label: '智能服务',
-    value: 'OpenAI Compatible',
-    detail: 'DeepSeek 优先配置',
+    label: '智能老师',
+    value: 'DeepSeek',
+    detail: '用于分段和指法建议',
     icon: Bot,
   },
 ]
@@ -35,6 +36,11 @@ const localRuntime = [
 export function SettingsPage() {
   const themePreference = useThemeStore((state) => state.preference)
   const setThemePreference = useThemeStore((state) => state.setPreference)
+  const storageInfo = useQuery({
+    queryKey: ['storage-info'],
+    queryFn: runtimeApi.getStorageInfo,
+    staleTime: Infinity,
+  })
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background text-foreground/90">
@@ -47,7 +53,7 @@ export function SettingsPage() {
           <div className="mt-2 flex min-w-0 items-baseline gap-4">
             <h1 className="shrink-0 font-title text-2xl font-bold text-foreground/95">本地设置</h1>
             <p className="truncate text-xs tracking-wide text-muted-foreground max-[640px]:hidden">
-              管理演奏输入与本地运行环境
+              管理输入设备和智能老师
             </p>
           </div>
         </div>
@@ -59,15 +65,15 @@ export function SettingsPage() {
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_19rem] max-[920px]:grid-cols-1 max-[920px]:overflow-y-auto">
         <main className="min-h-0 min-w-0 overflow-y-auto max-[920px]:overflow-visible">
-          <Accordion type="multiple" defaultValue={['llm']}>
-            <AccordionItem value="llm">
+          <Accordion type="single" collapsible defaultValue="llm">
+            <AccordionItem value="llm" className="data-[state=open]:border-l-2 data-[state=open]:border-primary data-[state=open]:bg-primary/[0.035]">
               <AccordionTrigger>
                 <SettingsSectionTitle
                   index="01"
                   icon={Bot}
-                  title="模型服务"
-                  detail="DeepSeek 与 OpenAI Compatible"
-                  status="智能服务"
+                  title="智能老师"
+                  detail="选择 DeepSeek 模型"
+                  status="DeepSeek"
                 />
               </AccordionTrigger>
               <AccordionContent>
@@ -75,14 +81,14 @@ export function SettingsPage() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="input">
+            <AccordionItem value="input" className="data-[state=open]:border-l-2 data-[state=open]:border-primary data-[state=open]:bg-primary/[0.035]">
               <AccordionTrigger>
                 <SettingsSectionTitle
                   index="02"
                   icon={Piano}
                   title="钢琴输入"
-                  detail="输入设备、连接状态与键盘范围"
-                  status="全局输入"
+                  detail="选择用于演奏和练习的设备"
+                  status="输入设备"
                 />
               </AccordionTrigger>
               <AccordionContent>
@@ -92,14 +98,14 @@ export function SettingsPage() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="preferences">
+            <AccordionItem value="preferences" className="data-[state=open]:border-l-2 data-[state=open]:border-primary data-[state=open]:bg-primary/[0.035]">
               <AccordionTrigger>
                 <SettingsSectionTitle
                   index="03"
                   icon={Palette}
                   title="主题与语言"
-                  detail="界面主题和本地语言偏好"
-                  status="本机偏好"
+                  detail="调整界面显示"
+                  status="显示设置"
                 />
               </AccordionTrigger>
               <AccordionContent>
@@ -116,21 +122,24 @@ export function SettingsPage() {
           <div className="border-b border-border px-6 py-5">
             <div className="flex items-center gap-3">
               <HardDrive className="size-4 text-muted-foreground" />
-              <p className="text-[9px] font-bold tracking-[0.32em] text-muted-foreground">运行环境</p>
+              <p className="text-[9px] font-bold tracking-[0.32em] text-muted-foreground">完全本地</p>
             </div>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">应用使用的本地服务与存储位置</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">数据和服务都在本机运行</p>
           </div>
 
           <dl className="flex-1 px-6 py-2">
             {localRuntime.map((item) => {
               const Icon = item.icon
+              const value = item.label === '应用数据'
+                ? storageInfo.data?.dataDirectory ?? '正在读取…'
+                : item.value ?? ''
               return (
                 <div key={item.label} className="border-b border-border py-5 last:border-b-0">
                   <dt className="flex items-center gap-3 text-[9px] font-bold tracking-[0.24em] text-muted-foreground">
                     <Icon className="size-3.5" />
                     {item.label}
                   </dt>
-                  <dd className="mt-3 break-words text-xs font-bold leading-5 text-foreground/65">{item.value}</dd>
+                  <dd className="mt-3 break-words text-xs font-bold leading-5 text-foreground/65" title={value}>{value}</dd>
                   <dd className="mt-1 text-[10px] tracking-wide text-muted-foreground">{item.detail}</dd>
                 </div>
               )
@@ -138,7 +147,7 @@ export function SettingsPage() {
           </dl>
 
           <div className="border-t border-border px-6 py-5 text-[10px] leading-5 tracking-wide text-muted-foreground">
-            输入设备设置即时生效，并由当前设备保存在本机。MIDI 校准不会修改原始设备数据。
+            输入设备设置会立即生效。MIDI 校准不会修改原始设备数据。
           </div>
         </aside>
       </div>
@@ -208,7 +217,7 @@ function PreferencesPanel({
                   onClick={() => onThemeChange(option.value)}
                   className={cn(
                     'flex h-12 items-center justify-center gap-2 bg-background px-3 text-xs font-bold outline-none transition focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary',
-                    selected ? 'text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                    selected ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                   )}
                 >
                   <Icon className="size-3.5" />

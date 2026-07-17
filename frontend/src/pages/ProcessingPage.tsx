@@ -314,16 +314,22 @@ export function ProcessingPage() {
           <ol className="flex-1 px-6 py-3">
             {workflow.map((label, index) => {
               const step = index + 1
-              const completed = currentStep >= step
-              const active = currentStep + 1 === step
+              const active = !outputPath && currentStep + 1 === step
+              const completed = currentStep >= step && !active
               return (
-                <li key={label} className="relative flex min-h-16 gap-4 border-b border-border py-4 last:border-b-0">
+                <li
+                  key={label}
+                  className={cn(
+                    'relative flex min-h-16 gap-4 border-b border-border px-2 py-4 last:border-b-0',
+                    active && 'bg-primary text-primary-foreground',
+                  )}
+                >
                   <span className={cn(
                     'grid size-6 shrink-0 place-items-center border text-[9px] font-bold',
-                    completed
-                      ? 'border-primary/60 text-primary'
-                      : active
-                        ? 'border-foreground/35 text-foreground/75'
+                    active
+                      ? 'border-primary-foreground/50 bg-primary text-primary-foreground'
+                      : completed
+                        ? 'border-primary/40 text-primary/70'
                         : 'border-border text-muted-foreground',
                   )}>
                     {completed ? <Check className="size-3" /> : step.toString().padStart(2, '0')}
@@ -331,11 +337,11 @@ export function ProcessingPage() {
                   <div className="pt-0.5">
                     <p className={cn(
                       'text-xs font-bold tracking-wide',
-                      completed ? 'text-foreground/65' : active ? 'text-foreground/90' : 'text-muted-foreground',
+                      active ? 'text-primary-foreground' : completed ? 'text-foreground/65' : 'text-muted-foreground',
                     )}>
                       {label}
                     </p>
-                    {active ? <p className="mt-1 text-[9px] tracking-widest text-primary">当前步骤</p> : null}
+                    {active ? <p className="mt-1 text-[9px] tracking-widest text-primary-foreground/70">当前步骤</p> : null}
                   </div>
                 </li>
               )

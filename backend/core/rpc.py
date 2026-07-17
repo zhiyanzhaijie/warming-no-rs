@@ -12,7 +12,7 @@ from core.app.piece_stages import (
     RenamePieceStagePlanCommand,
 )
 from core.domain.music import MusicPiece, MusicPieceId
-from core.infra.setup import init_app_container
+from core.infra.setup import default_state_path, init_app_container
 
 
 container = init_app_container()
@@ -42,6 +42,12 @@ def handle_line(line: str) -> dict[str, Any]:
 
 
 def dispatch(method: str, params: dict[str, Any]) -> Any:
+    if method == "app_get_storage_info":
+        state_path = default_state_path()
+        return {
+            "databasePath": str(state_path),
+            "dataDirectory": str(state_path.parent),
+        }
     if method == "music_list_pieces":
         return [piece_response(piece) for piece in container.music.query.list_pieces()]
     if method == "music_get_piece":

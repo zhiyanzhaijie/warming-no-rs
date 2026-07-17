@@ -30,6 +30,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            python_sidecar::app_get_storage_info,
             python_sidecar::music_list_pieces,
             python_sidecar::music_get_piece,
             python_sidecar::music_get_piece_score,

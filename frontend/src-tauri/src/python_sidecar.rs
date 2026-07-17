@@ -197,6 +197,11 @@ pub async fn music_delete_piece(piece_id: String) -> Result<Value, String> {
 }
 
 #[tauri::command]
+pub async fn app_get_storage_info() -> Result<Value, String> {
+    call_async("app_get_storage_info", json!({})).await
+}
+
+#[tauri::command]
 pub async fn music_list_watch_paths() -> Result<Value, String> {
     call_async("music_list_watch_paths", json!({})).await
 }
