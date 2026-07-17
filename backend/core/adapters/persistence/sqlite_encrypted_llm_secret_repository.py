@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 
 _ENCRYPTION_VERSION = 1
-_AAD = b"agent-piano:llm-api-key:v1"
+_AAD = b"warming:llm-api-key:v1"
 
 
 class SqliteEncryptedLlmSecretRepository:

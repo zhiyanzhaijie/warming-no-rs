@@ -50,8 +50,7 @@ impl Default for MidiInputState {
 
 #[tauri::command]
 pub fn midi_list_inputs() -> Result<Vec<MidiInputDevice>, String> {
-    let input =
-        midir::MidiInput::new("agent-piano-input-list").map_err(|error| error.to_string())?;
+    let input = midir::MidiInput::new("warming-input-list").map_err(|error| error.to_string())?;
     input
         .ports()
         .iter()
@@ -72,8 +71,7 @@ pub fn midi_connect_input(
     state: State<'_, MidiInputState>,
     device_id: String,
 ) -> Result<(), String> {
-    let mut input =
-        midir::MidiInput::new("agent-piano-input").map_err(|error| error.to_string())?;
+    let mut input = midir::MidiInput::new("warming-input").map_err(|error| error.to_string())?;
     input.ignore(midir::Ignore::None);
     let port = input
         .ports()
@@ -88,7 +86,7 @@ pub fn midi_connect_input(
     let connection = input
         .connect(
             &port,
-            "agent-piano-input-connection",
+            "warming-input-connection",
             move |_, message, _| {
                 if let Some(event) = parse_message(&source_id, message) {
                     let _ = app.emit("piano-input", event);
