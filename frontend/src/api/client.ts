@@ -48,6 +48,9 @@ export const apiClient = {
   addWatchPaths(paths: string[]) {
     return invoke<MidiScanReport>('music_add_watch_paths', { paths })
   },
+  removeWatchPath(path: string) {
+    return invoke<{ removed: boolean }>('music_remove_watch_path', { path })
+  },
   refreshLocalLibrary() {
     return invoke<MidiScanReport>('music_refresh_library')
   },

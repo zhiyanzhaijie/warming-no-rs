@@ -212,6 +212,11 @@ pub async fn music_add_watch_paths(paths: Vec<String>) -> Result<Value, String> 
 }
 
 #[tauri::command]
+pub async fn music_remove_watch_path(path: String) -> Result<Value, String> {
+    call_async("music_remove_watch_path", json!({ "path": path })).await
+}
+
+#[tauri::command]
 pub async fn music_refresh_library() -> Result<Value, String> {
     call_async("music_refresh_library", json!({})).await
 }

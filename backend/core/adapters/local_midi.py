@@ -32,6 +32,15 @@ class LocalMidiFileAdapter:
         with self._lock:
             self._dirty = True
 
+    def remove_watch_path(self, path: str) -> bool:
+        paths = self._repository.list_watch_paths()
+        if path not in paths:
+            return False
+        self._repository.save_watch_paths([candidate for candidate in paths if candidate != path])
+        with self._lock:
+            self._dirty = True
+        return True
+
     def watched_paths(self) -> list[str]:
         return self._repository.list_watch_paths()
 

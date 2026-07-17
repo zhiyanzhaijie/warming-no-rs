@@ -192,6 +192,9 @@ class LocalMidiLibraryCommandHandler:
             self._watcher.watch_path(path)
         return self.refresh_watched_paths()
 
+    def remove_watch_path(self, path: str) -> bool:
+        return self._watcher.remove_watch_path(path)
+
     def refresh_if_dirty(self) -> MidiScanReport | None:
         if not self._watcher.is_dirty():
             return None

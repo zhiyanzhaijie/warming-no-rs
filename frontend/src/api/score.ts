@@ -9,5 +9,6 @@ export const scoreApi = {
   selectWatchDirectories: apiClient.selectWatchDirectories,
   addWatchPath: apiClient.addWatchPath,
   addWatchPaths: apiClient.addWatchPaths,
+  removeWatchPath: apiClient.removeWatchPath,
   refreshLocalLibrary: apiClient.refreshLocalLibrary,
 }

@@ -38,6 +38,7 @@ pub fn run() {
             python_sidecar::music_list_watch_paths,
             python_sidecar::music_add_watch_path,
             python_sidecar::music_add_watch_paths,
+            python_sidecar::music_remove_watch_path,
             python_sidecar::music_refresh_library,
             python_sidecar::select_midi_watch_directories,
             llm_settings::llm_get_settings,

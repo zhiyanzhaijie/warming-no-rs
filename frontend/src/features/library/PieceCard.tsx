@@ -26,11 +26,11 @@ export function PieceCard({
   }
 
   return (
-    <article className="group relative flex flex-col overflow-hidden border-b border-border/40 bg-transparent py-6 transition-all duration-500 hover:bg-foreground/[0.02]">
-      <div className="flex items-start justify-between gap-4 px-2">
+    <article className="group relative flex flex-col overflow-hidden border border-transparent border-b-border/40 bg-transparent px-3 py-8 transition-[border-color,background-color] duration-300 hover:border-primary hover:bg-background/35 focus-within:border-primary focus-within:bg-background/35">
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
-            <h2 className="truncate font-title text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+            <h2 className="truncate font-title text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary group-focus-within:text-primary">
               {piece.title}
             </h2>
             <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -46,7 +46,7 @@ export function PieceCard({
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-4 px-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+      <div className="mt-6 flex flex-wrap items-center gap-5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
         <div className="flex items-center gap-1.5" title="音符数">
           <Music className="size-3 text-muted-foreground/70" />
           <span>{piece.noteCount ?? 0}</span>
@@ -61,23 +61,28 @@ export function PieceCard({
         </div>
       </div>
 
-      <div className="mt-4 flex-1 px-2">
+      <div className="mt-6 flex-1">
         <div className="flex justify-between text-[9px] font-bold tracking-widest text-muted-foreground">
           <span>PROGRESS</span>
           <span className="text-foreground/80">{Math.round(piece.progress * 100)}%</span>
         </div>
         <div className="mt-1.5 h-[2px] overflow-hidden bg-muted">
           <div
-            className="h-full bg-foreground transition-all duration-500 ease-out group-hover:bg-primary"
+            className="h-full bg-foreground transition-all duration-500 ease-out group-hover:bg-primary group-focus-within:bg-primary"
             style={{ width: `${piece.progress * 100}%` }}
           />
         </div>
       </div>
 
-      <div className="mt-5 flex items-center gap-2 px-2">
+      <div className="mt-7 flex items-center gap-2">
         {confirmingRemove ? (
           <div className="flex w-full items-center justify-between border-t border-border/40 bg-transparent pt-3">
-            <span className="whitespace-nowrap text-[9px] font-bold tracking-widest text-destructive">确认抹去此档案?</span>
+            <div className="min-w-0 flex-1 pr-4">
+              <span className="block text-[10px] font-bold tracking-widest text-destructive">确认抹去此档案?</span>
+              <span className="mt-1 block text-[9px] leading-relaxed text-muted-foreground">
+                档案一旦删除，下属的练习方案和指法提示将全部清除
+              </span>
+            </div>
             <div className="flex shrink-0 gap-2">
               <button
                 type="button"
@@ -103,7 +108,7 @@ export function PieceCard({
           <>
             <button
               type="button"
-              className="flex h-8 min-w-0 flex-1 items-center justify-center gap-2 border border-border/40 bg-transparent px-3 text-[10px] font-bold uppercase tracking-widest text-foreground transition-all hover:border-foreground hover:bg-foreground hover:text-background"
+              className="flex h-8 min-w-0 flex-1 items-center justify-center gap-2 border border-foreground/35 bg-transparent px-3 text-[10px] font-bold uppercase tracking-widest text-foreground transition-colors duration-300 group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground group-focus-within:border-primary group-focus-within:bg-primary group-focus-within:text-primary-foreground"
               onClick={beginPractice}
             >
               <Play className="size-3 shrink-0 fill-current" />

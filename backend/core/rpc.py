@@ -138,6 +138,9 @@ def dispatch(method: str, params: dict[str, Any]) -> Any:
     if method == "music_add_watch_paths":
         report = container.music.local_library.add_watch_paths(params["paths"])
         return scan_report_response(report)
+    if method == "music_remove_watch_path":
+        removed = container.music.local_library.remove_watch_path(params["path"])
+        return {"removed": removed}
     if method == "music_refresh_library":
         report = container.music.local_library.refresh_watched_paths()
         return scan_report_response(report)
