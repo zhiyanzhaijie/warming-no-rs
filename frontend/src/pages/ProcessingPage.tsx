@@ -10,8 +10,14 @@ import {
   Upload,
   Wrench,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { transcriptionApi, type SelectedAudioFile, type TranscriptionTask } from '../api/transcription'
+import { useEffect, useState, type ReactNode } from 'react'
+import {
+  transcriptionApi,
+  type SelectedAudioFile,
+  type TranscriptionTask,
+  type TranskunInstallTask,
+  type TranskunStatus,
+} from '../api/transcription'
 import { cn } from '@/lib/utils'
 
 const workflow = [
@@ -20,6 +26,17 @@ const workflow = [
   '指定保存位置',
   '完成本地转写',
 ]
+
+const PYTHON_DOWNLOAD_URL = 'https://www.python.org/downloads/macos/'
+
+async function openPythonDownloads() {
+  try {
+    const { openUrl } = await import('@tauri-apps/plugin-opener')
+    await openUrl(PYTHON_DOWNLOAD_URL)
+  } catch {
+    window.open(PYTHON_DOWNLOAD_URL, '_blank', 'noopener,noreferrer')
+  }
+}
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -49,6 +66,30 @@ export function ProcessingPage() {
     queryKey: ['transcription-task'],
     queryFn: transcriptionApi.getTask,
     refetchInterval: (query) => ['running', 'cancelling'].includes(query.state.data?.status ?? '') ? 750 : false,
+  })
+  const installTask = useQuery({
+    queryKey: ['transkun-install-task'],
+    queryFn: transcriptionApi.getInstallTask,
+    refetchInterval: (query) => query.state.data?.status === 'running' ? 500 : false,
+  })
+  const installTranskun = useMutation({
+    mutationFn: transcriptionApi.installTranskun,
+    onMutate: () => {
+      queryClient.setQueryData<TranskunInstallTask>(['transkun-install-task'], {
+        status: 'running',
+        logs: ['正在启动安装任务'],
+        error: null,
+      })
+      setMessage(null)
+    },
+    onSuccess: (status) => {
+      queryClient.setQueryData(['transkun-status'], status)
+      setMessage(null)
+    },
+    onError: (error) => setMessage(error instanceof Error ? error.message : 'TransKun 安装失败'),
+    onSettled: () => {
+      void installTask.refetch()
+    },
   })
   const selectFile = useMutation({
     mutationFn: transcriptionApi.selectAudio,
@@ -209,101 +250,75 @@ export function ProcessingPage() {
             </div>
           </section>
 
-          <button
-            type="button"
-            disabled={!ready || selectFile.isPending || isRunning}
-            onClick={() => selectFile.mutate()}
-            className="group relative flex min-h-64 flex-1 items-center justify-center overflow-hidden border-b border-border px-8 py-10 text-left transition hover:bg-foreground/[0.025] disabled:cursor-not-allowed disabled:opacity-40 max-[720px]:px-5"
-          >
-            <span className="pointer-events-none absolute inset-x-8 top-1/2 h-px bg-border max-[720px]:inset-x-5" />
-            <span className="pointer-events-none absolute inset-y-8 left-1/2 w-px bg-border" />
-            <div className="relative z-10 flex w-full max-w-2xl items-center gap-6 border border-border bg-background px-6 py-7 transition group-hover:border-foreground/30 max-[600px]:items-start max-[600px]:gap-4 max-[600px]:px-4">
-              <div className="grid size-12 shrink-0 place-items-center border border-border text-muted-foreground transition group-hover:border-primary/60 group-hover:text-primary">
-                {selectFile.isPending ? <LoaderCircle className="size-5 animate-spin" /> : file ? <FileAudio className="size-5" /> : <Upload className="size-5" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold tracking-[0.3em] text-muted-foreground">
-                  {file ? '当前音频' : '输入文件'}
-                </p>
-                <p className="mt-2 truncate font-title text-lg font-bold text-foreground/90" title={file?.name}>
-                  {file?.name ?? '选择钢琴音频'}
-                </p>
-                {file ? (
-                  <>
-                    <p className="mt-1 text-xs tracking-wide text-muted-foreground">
-                      {formatBytes(file.sizeBytes)} · {(file.name.split('.').pop() ?? '音频').toUpperCase()}
-                    </p>
-                    <p className="mt-3 truncate text-[10px] tracking-wide text-muted-foreground" title={file.path}>
-                      {file.path}
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                    支持 MP3、FLAC、WAV、M4A、AAC、OGG 与 Opus
-                  </p>
-                )}
-              </div>
-              <span className="shrink-0 text-[9px] font-bold tracking-[0.2em] text-muted-foreground transition group-hover:text-foreground/70 max-[600px]:hidden">
-                {file ? '更换文件' : '浏览文件'}
-              </span>
-            </div>
-          </button>
-
-          {task.data && task.data.status !== 'idle' && task.data.inputPath === file?.path ? (
-            <TaskOutput task={task.data} elapsed={elapsed} progress={progress} />
-          ) : null}
-
-          <section className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-5 px-8 py-5 max-[720px]:grid-cols-1 max-[720px]:px-5">
-            <div className="min-w-0">
-              {outputPath ? (
-                <div className="flex min-w-0 items-center gap-3 text-primary">
-                  <FileMusic className="size-4 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold tracking-wide">MIDI 已生成</p>
-                    <p className="mt-1 truncate text-[10px] text-muted-foreground" title={outputPath}>{outputPath}</p>
+          {ready ? (
+            <>
+              <button
+                type="button"
+                disabled={selectFile.isPending || isRunning}
+                onClick={() => selectFile.mutate()}
+                className="group relative flex min-h-64 flex-1 items-center justify-center overflow-hidden border-b border-border px-8 py-10 text-left transition hover:bg-foreground/[0.025] disabled:cursor-not-allowed disabled:opacity-40 max-[720px]:px-5"
+              >
+                <span className="pointer-events-none absolute inset-x-8 top-1/2 h-px bg-border max-[720px]:inset-x-5" />
+                <span className="pointer-events-none absolute inset-y-8 left-1/2 w-px bg-border" />
+                <div className="relative z-10 flex w-full max-w-2xl items-center gap-6 border border-border bg-background px-6 py-7 transition group-hover:border-foreground/30 max-[600px]:items-start max-[600px]:gap-4 max-[600px]:px-4">
+                  <div className="grid size-12 shrink-0 place-items-center border border-border text-muted-foreground transition group-hover:border-primary/60 group-hover:text-primary">
+                    {selectFile.isPending ? <LoaderCircle className="size-5 animate-spin" /> : file ? <FileAudio className="size-5" /> : <Upload className="size-5" />}
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-bold tracking-[0.3em] text-muted-foreground">
+                      {file ? '当前音频' : '输入文件'}
+                    </p>
+                    <p className="mt-2 truncate font-title text-lg font-bold text-foreground/90" title={file?.name}>
+                      {file?.name ?? '选择钢琴音频'}
+                    </p>
+                    {file ? (
+                      <>
+                        <p className="mt-1 text-xs tracking-wide text-muted-foreground">
+                          {formatBytes(file.sizeBytes)} · {(file.name.split('.').pop() ?? '音频').toUpperCase()}
+                        </p>
+                        <p className="mt-3 truncate text-[10px] tracking-wide text-muted-foreground" title={file.path}>
+                          {file.path}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                        支持 MP3、FLAC、WAV、M4A、AAC、OGG 与 Opus
+                      </p>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-[9px] font-bold tracking-[0.2em] text-muted-foreground transition group-hover:text-foreground/70 max-[600px]:hidden">
+                    {file ? '更换文件' : '浏览文件'}
+                  </span>
                 </div>
-              ) : message ? (
-                <p className="text-xs font-bold text-destructive">{message}</p>
-              ) : (
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <FolderOutput className="size-4 shrink-0" />
-                  <p className="text-[10px] leading-5 tracking-wide">
-                    生成时选择保存位置，源文件不会被修改
-                  </p>
-                </div>
-              )}
-            </div>
-            {isRunning ? (
-              <button
-                type="button"
-                disabled={isCancelling}
-                onClick={() => cancelTask.mutate()}
-                className="flex h-10 min-w-56 items-center justify-center gap-2 border border-destructive/70 px-5 text-[10px] font-bold tracking-[0.18em] text-destructive transition hover:bg-destructive hover:text-black disabled:cursor-wait disabled:opacity-40 max-[720px]:w-full"
-              >
-                {isCancelling ? <LoaderCircle className="size-3.5 animate-spin" /> : <CircleStop className="size-3.5" />}
-                {isCancelling ? '正在取消转换' : `取消转换 · ${formatDuration(elapsed)}`}
               </button>
-            ) : isFinished ? (
-              <button
-                type="button"
-                disabled={resetTask.isPending}
-                onClick={() => resetTask.mutate()}
-                className="h-10 min-w-56 border border-primary bg-primary px-5 text-[10px] font-bold tracking-[0.18em] text-black transition hover:bg-transparent hover:text-primary disabled:opacity-40 max-[720px]:w-full"
-              >
-                {resetTask.isPending ? '正在恢复' : '完成'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={!ready || !file || generate.isPending}
-                onClick={() => file && generate.mutate(file.path)}
-                className="h-10 min-w-56 border border-primary bg-primary px-5 text-[10px] font-bold tracking-[0.18em] text-primary-foreground transition hover:bg-transparent hover:text-primary disabled:border-border disabled:bg-transparent disabled:text-muted-foreground max-[720px]:w-full"
-              >
-                选择保存位置并生成 MIDI
-              </button>
-            )}
-          </section>
+
+              {task.data && task.data.status !== 'idle' && task.data.inputPath === file?.path ? (
+                <TaskOutput task={task.data} elapsed={elapsed} progress={progress} />
+              ) : null}
+
+              <ProcessingActionFooter
+                outputPath={outputPath}
+                message={message}
+                isRunning={isRunning}
+                isCancelling={isCancelling}
+                isFinished={isFinished}
+                elapsed={elapsed}
+                resetPending={resetTask.isPending}
+                generatePending={generate.isPending}
+                onCancel={() => cancelTask.mutate()}
+                onReset={() => resetTask.mutate()}
+                onGenerate={() => file && generate.mutate(file.path)}
+              />
+            </>
+          ) : (
+            <TranskunInstallGuide
+              status={transkun.data}
+              installTask={installTask.data}
+              installing={installTranskun.isPending || installTask.data?.status === 'running'}
+              onInstall={() => installTranskun.mutate()}
+              onRefresh={() => void transkun.refetch()}
+            />
+          )}
         </main>
 
         <aside className="flex min-h-0 flex-col border-l border-border max-[920px]:border-l-0 max-[920px]:border-t">
@@ -398,6 +413,221 @@ function ProcessingPageLoading() {
             ))}
           </div>
         </aside>
+      </div>
+    </div>
+  )
+}
+
+function ProcessingActionFooter({
+  outputPath,
+  message,
+  isRunning,
+  isCancelling,
+  isFinished,
+  elapsed,
+  resetPending,
+  generatePending,
+  onCancel,
+  onReset,
+  onGenerate,
+}: {
+  outputPath: string | null
+  message: string | null
+  isRunning: boolean
+  isCancelling: boolean
+  isFinished: boolean
+  elapsed: number
+  resetPending: boolean
+  generatePending: boolean
+  onCancel: () => void
+  onReset: () => void
+  onGenerate: () => void
+}) {
+  return (
+    <section className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-5 px-8 py-5 max-[720px]:grid-cols-1 max-[720px]:px-5">
+      <div className="min-w-0">
+        {outputPath ? (
+          <div className="flex min-w-0 items-center gap-3 text-primary">
+            <FileMusic className="size-4 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-bold tracking-wide">MIDI 已生成</p>
+              <p className="mt-1 truncate text-[10px] text-muted-foreground" title={outputPath}>{outputPath}</p>
+            </div>
+          </div>
+        ) : message ? (
+          <p className="text-xs font-bold text-destructive">{message}</p>
+        ) : (
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <FolderOutput className="size-4 shrink-0" />
+            <p className="text-[10px] leading-5 tracking-wide">
+              生成时选择保存位置，源文件不会被修改
+            </p>
+          </div>
+        )}
+      </div>
+      {isRunning ? (
+        <button
+          type="button"
+          disabled={isCancelling}
+          onClick={onCancel}
+          className="flex h-10 min-w-56 items-center justify-center gap-2 border border-destructive/70 px-5 text-[10px] font-bold tracking-[0.18em] text-destructive transition hover:bg-destructive hover:text-black disabled:cursor-wait disabled:opacity-40 max-[720px]:w-full"
+        >
+          {isCancelling ? <LoaderCircle className="size-3.5 animate-spin" /> : <CircleStop className="size-3.5" />}
+          {isCancelling ? '正在取消转换' : `取消转换 · ${formatDuration(elapsed)}`}
+        </button>
+      ) : isFinished ? (
+        <button
+          type="button"
+          disabled={resetPending}
+          onClick={onReset}
+          className="h-10 min-w-56 border border-primary bg-primary px-5 text-[10px] font-bold tracking-[0.18em] text-black transition hover:bg-transparent hover:text-primary disabled:opacity-40 max-[720px]:w-full"
+        >
+          {resetPending ? '正在恢复' : '完成'}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={generatePending}
+          onClick={onGenerate}
+          className="h-10 min-w-56 border border-primary bg-primary px-5 text-[10px] font-bold tracking-[0.18em] text-primary-foreground transition hover:bg-transparent hover:text-primary disabled:border-border disabled:bg-transparent disabled:text-muted-foreground max-[720px]:w-full"
+        >
+          选择保存位置并生成 MIDI
+        </button>
+      )}
+    </section>
+  )
+}
+
+function TranskunInstallGuide({
+  status,
+  installTask,
+  installing,
+  onInstall,
+  onRefresh,
+}: {
+  status?: TranskunStatus
+  installTask?: TranskunInstallTask
+  installing: boolean
+  onInstall: () => void
+  onRefresh: () => void
+}) {
+  const pythonAvailable = status?.pythonAvailable === true
+  return (
+    <section className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto border-b border-border px-8 py-10 max-[720px]:px-5">
+      <div className="w-full max-w-2xl">
+        <div className="border-b border-border pb-5">
+          <p className="text-[9px] font-bold tracking-[0.28em] text-primary">需要准备转换环境</p>
+          <h2 className="mt-2 font-title text-xl font-bold text-foreground">
+            {pythonAvailable ? '安装 TransKun' : '先安装 Python'}
+          </h2>
+          <p className="mt-2 max-w-xl text-xs leading-5 text-muted-foreground">
+            {pythonAvailable
+              ? 'Python 已准备好。点击下面的按钮，应用会自动安装 TransKun。'
+              : '音频转 MIDI 需要 Python。请先从官网下载并安装 Python，完成后回来重新检测。'}
+          </p>
+        </div>
+
+        <div className="divide-y divide-border">
+          <InstallStep number="01" title={pythonAvailable ? 'Python 已找到' : '安装 Python'}>
+            {pythonAvailable ? (
+              <p className="text-[10px] leading-5 text-primary">应用已经找到 Python，可以继续安装 TransKun。</p>
+            ) : (
+              <>
+                <p className="text-[10px] leading-5 text-muted-foreground">
+                  从 Python 官网下载 macOS 安装包，按安装向导完成安装。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void openPythonDownloads()}
+                  className="mt-3 inline-flex h-8 items-center border border-border px-3 text-[10px] font-bold text-foreground transition-colors hover:border-primary hover:text-primary"
+                >
+                  打开 Python 下载页
+                </button>
+              </>
+            )}
+          </InstallStep>
+          <InstallStep number="02" title="让应用安装 TransKun">
+            <p className="text-[10px] leading-5 text-muted-foreground">
+              Python 检测成功后，应用会自动完成安装，不需要打开终端。
+            </p>
+            {pythonAvailable ? (
+              <button
+                type="button"
+                onClick={onInstall}
+                disabled={installing}
+                className="mt-3 flex h-9 items-center gap-2 bg-primary px-4 text-[10px] font-bold tracking-widest text-primary-foreground transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-50"
+              >
+                {installing ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
+                {installing ? '正在安装 TransKun' : '安装 TransKun'}
+              </button>
+            ) : null}
+            {installTask && installTask.status !== 'idle' ? (
+              <InstallLogPanel task={installTask} />
+            ) : null}
+          </InstallStep>
+          <InstallStep number="03" title="完成后重新检测">
+            <p className="text-[10px] leading-5 text-muted-foreground">
+              安装完成后点击重新检测，确认转换功能已经准备好。
+            </p>
+          </InstallStep>
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+          <p className="text-[10px] text-muted-foreground">
+            官方项目：<span className="text-foreground/75">github.com/Yujia-Yan/Transkun</span>
+          </p>
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="flex h-9 items-center gap-2 bg-primary px-4 text-[10px] font-bold tracking-widest text-primary-foreground transition hover:bg-primary-hover"
+          >
+            <RefreshCw className="size-3.5" />
+            重新检测
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function InstallLogPanel({ task }: { task: TranskunInstallTask }) {
+  const running = task.status === 'running'
+  const logs = task.logs.slice(-12)
+  return (
+    <div className="mt-4 border-l-2 border-primary/60 pl-3">
+      <div className="flex items-center justify-between gap-4 text-[9px] font-bold tracking-[0.18em]">
+        <span className={task.status === 'failed' ? 'text-destructive' : 'text-primary'}>
+          {running ? '正在安装' : task.status === 'succeeded' ? '安装完成' : '安装失败'}
+        </span>
+        {running ? <LoaderCircle className="size-3 animate-spin text-primary" /> : null}
+      </div>
+      <div className="mt-2 max-h-36 overflow-y-auto font-mono text-[10px] leading-5 text-muted-foreground">
+        {logs.length > 0
+          ? logs.map((line, index) => <p key={`${index}-${line}`}>{line}</p>)
+          : <p>等待安装输出...</p>}
+      </div>
+      {task.error ? <p className="mt-2 text-[10px] leading-5 text-destructive">{task.error}</p> : null}
+    </div>
+  )
+}
+
+function InstallStep({
+  number,
+  title,
+  children,
+}: {
+  number: string
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <div className="grid grid-cols-[2rem_minmax(0,1fr)] gap-4 py-5">
+      <span className="grid size-6 place-items-center border border-border text-[9px] font-bold text-muted-foreground">
+        {number}
+      </span>
+      <div className="min-w-0">
+        <h3 className="text-xs font-bold text-foreground/90">{title}</h3>
+        <div className="mt-2">{children}</div>
       </div>
     </div>
   )

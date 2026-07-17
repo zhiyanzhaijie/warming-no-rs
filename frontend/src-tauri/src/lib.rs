@@ -9,6 +9,7 @@ use tauri::{path::BaseDirectory, Manager};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let soundfont = app
                 .path()
@@ -53,6 +54,8 @@ pub fn run() {
             llm_settings::music_activate_stage_plan,
             llm_settings::music_delete_stage_plan,
             transcription::check_transkun,
+            transcription::get_transkun_install_task,
+            transcription::install_transkun,
             transcription::select_audio_file,
             transcription::get_transcription_task,
             transcription::generate_midi,

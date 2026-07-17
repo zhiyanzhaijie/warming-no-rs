@@ -3,6 +3,8 @@ import { isTauriRuntime } from '../desktop/tauri'
 export type TranskunStatus = {
   available: boolean
   command: string | null
+  pythonAvailable: boolean
+  pythonCommand: string | null
   detail: string
 }
 
@@ -24,6 +26,12 @@ export type TranscriptionTask = {
   error: string | null
 }
 
+export type TranskunInstallTask = {
+  status: 'idle' | 'running' | 'succeeded' | 'failed'
+  logs: string[]
+  error: string | null
+}
+
 async function invokeDesktop<T>(command: string, args?: Record<string, unknown>) {
   if (!isTauriRuntime()) {
     throw new Error('此功能需要在桌面应用中使用。')
@@ -34,6 +42,8 @@ async function invokeDesktop<T>(command: string, args?: Record<string, unknown>)
 
 export const transcriptionApi = {
   checkTranskun: () => invokeDesktop<TranskunStatus>('check_transkun'),
+  getInstallTask: () => invokeDesktop<TranskunInstallTask>('get_transkun_install_task'),
+  installTranskun: () => invokeDesktop<TranskunStatus>('install_transkun'),
   selectAudio: () => invokeDesktop<SelectedAudioFile | null>('select_audio_file'),
   getTask: () => invokeDesktop<TranscriptionTask>('get_transcription_task'),
   generateMidi: (inputPath: string) =>
