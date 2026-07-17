@@ -35,3 +35,12 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
   "NSView",
   "NSWindow",
 ] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = "fat"
+opt-level = "z"
+strip = "symbols"
+debug = false
+incremental = false
