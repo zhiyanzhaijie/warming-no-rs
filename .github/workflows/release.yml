@@ -17,11 +17,6 @@ on:
           - macos-arm64
           - macos-intel
           - windows
-      draft:
-        description: Create the GitHub Release as a draft
-        required: true
-        default: true
-        type: boolean
       prerelease:
         description: Mark the GitHub Release as a prerelease
         required: true
@@ -42,8 +37,6 @@ jobs:
   prepare-release:
     name: Prepare GitHub Release
     runs-on: ubuntu-latest
-    outputs:
-      release_name: ${{ steps.release-meta.outputs.release_name }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -86,17 +79,21 @@ jobs:
           )
           NODE
 
-      - name: Create GitHub Release
+      - name: Create or publish GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_NAME: ${{ steps.release-meta.outputs.release_name }}
-          RELEASE_DRAFT: ${{ inputs.draft }}
           RELEASE_PRERELEASE: ${{ inputs.prerelease }}
         run: |
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists; build artifacts will be added to it."
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$RELEASE_NAME" \
+              --draft=false \
+              --prerelease="$RELEASE_PRERELEASE"
+            echo "Release $RELEASE_TAG is published and ready for artifacts."
             exit 0
           fi
 
@@ -108,9 +105,6 @@ jobs:
             --generate-notes
           )
 
-          if [[ "$RELEASE_DRAFT" == "true" ]]; then
-            args+=(--draft)
-          fi
           if [[ "$RELEASE_PRERELEASE" == "true" ]]; then
             args+=(--prerelease)
           fi
@@ -165,11 +159,10 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build, sign, and upload DMG
+      - name: Build and sign DMG
         if: steps.apple-signing.outputs.enabled == 'true'
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ github.token }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -178,24 +171,32 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: frontend
-          tagName: ${{ inputs.tag }}
-          releaseName: ${{ needs.prepare-release.outputs.release_name }}
-          releaseDraft: ${{ inputs.draft }}
-          prerelease: ${{ inputs.prerelease }}
           args: --target aarch64-apple-darwin --bundles dmg --ci
 
-      - name: Build and upload unsigned DMG
+      - name: Build unsigned DMG
         if: steps.apple-signing.outputs.enabled == 'false'
         uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         with:
           projectPath: frontend
-          tagName: ${{ inputs.tag }}
-          releaseName: ${{ needs.prepare-release.outputs.release_name }}
-          releaseDraft: ${{ inputs.draft }}
-          prerelease: ${{ inputs.prerelease }}
           args: --target aarch64-apple-darwin --bundles dmg --ci --no-sign
+
+      - name: Upload DMG to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          shopt -s nullglob
+          artifacts=(
+            frontend/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          )
+          if [[ ${#artifacts[@]} -ne 1 ]]; then
+            echo "::error::Expected exactly one ARM64 DMG, found ${#artifacts[@]}."
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "${artifacts[0]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
 
   macos-intel:
     name: Build macOS Intel DMG
@@ -245,11 +246,10 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build, sign, and upload DMG
+      - name: Build and sign DMG
         if: steps.apple-signing.outputs.enabled == 'true'
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ github.token }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -258,24 +258,32 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: frontend
-          tagName: ${{ inputs.tag }}
-          releaseName: ${{ needs.prepare-release.outputs.release_name }}
-          releaseDraft: ${{ inputs.draft }}
-          prerelease: ${{ inputs.prerelease }}
           args: --target x86_64-apple-darwin --bundles dmg --ci
 
-      - name: Build and upload unsigned DMG
+      - name: Build unsigned DMG
         if: steps.apple-signing.outputs.enabled == 'false'
         uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         with:
           projectPath: frontend
-          tagName: ${{ inputs.tag }}
-          releaseName: ${{ needs.prepare-release.outputs.release_name }}
-          releaseDraft: ${{ inputs.draft }}
-          prerelease: ${{ inputs.prerelease }}
           args: --target x86_64-apple-darwin --bundles dmg --ci --no-sign
+
+      - name: Upload DMG to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          shopt -s nullglob
+          artifacts=(
+            frontend/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+          )
+          if [[ ${#artifacts[@]} -ne 1 ]]; then
+            echo "::error::Expected exactly one Intel DMG, found ${#artifacts[@]}."
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "${artifacts[0]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
 
   windows:
     name: Build Windows x64 NSIS
@@ -313,14 +321,29 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      - name: Build and upload NSIS installer
+      - name: Build NSIS installer
         uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         with:
           projectPath: frontend
-          tagName: ${{ inputs.tag }}
-          releaseName: ${{ needs.prepare-release.outputs.release_name }}
-          releaseDraft: ${{ inputs.draft }}
-          prerelease: ${{ inputs.prerelease }}
           args: --target x86_64-pc-windows-msvc --bundles nsis --ci
+
+      - name: Upload NSIS installer to GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          $artifacts = @(
+            Get-ChildItem `
+              -Path "frontend/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis" `
+              -Filter "*.exe" `
+              -File
+          )
+          if ($artifacts.Count -ne 1) {
+            Write-Error "Expected exactly one NSIS installer, found $($artifacts.Count)."
+            exit 1
+          }
+          $installer = $artifacts[0].FullName
+          gh release upload $env:RELEASE_TAG $installer `
+            --repo $env:GITHUB_REPOSITORY `
+            --clobber
