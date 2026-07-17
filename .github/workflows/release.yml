@@ -153,7 +153,20 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      - name: Build and upload DMG
+      - name: Detect Apple signing credentials
+        id: apple-signing
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+        run: |
+          if [[ -n "$APPLE_CERTIFICATE" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build, sign, and upload DMG
+        if: steps.apple-signing.outputs.enabled == 'true'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -170,6 +183,19 @@ jobs:
           releaseDraft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}
           args: --target aarch64-apple-darwin --bundles dmg --ci
+
+      - name: Build and upload unsigned DMG
+        if: steps.apple-signing.outputs.enabled == 'false'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          projectPath: frontend
+          tagName: ${{ inputs.tag }}
+          releaseName: ${{ needs.prepare-release.outputs.release_name }}
+          releaseDraft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
+          args: --target aarch64-apple-darwin --bundles dmg --ci --no-sign
 
   macos-intel:
     name: Build macOS Intel DMG
@@ -207,7 +233,20 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      - name: Build and upload DMG
+      - name: Detect Apple signing credentials
+        id: apple-signing
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+        run: |
+          if [[ -n "$APPLE_CERTIFICATE" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build, sign, and upload DMG
+        if: steps.apple-signing.outputs.enabled == 'true'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -224,6 +263,19 @@ jobs:
           releaseDraft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}
           args: --target x86_64-apple-darwin --bundles dmg --ci
+
+      - name: Build and upload unsigned DMG
+        if: steps.apple-signing.outputs.enabled == 'false'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          projectPath: frontend
+          tagName: ${{ inputs.tag }}
+          releaseName: ${{ needs.prepare-release.outputs.release_name }}
+          releaseDraft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
+          args: --target x86_64-apple-darwin --bundles dmg --ci --no-sign
 
   windows:
     name: Build Windows x64 NSIS
