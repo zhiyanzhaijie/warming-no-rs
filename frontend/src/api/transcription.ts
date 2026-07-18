@@ -6,6 +6,7 @@ export type TranskunStatus = {
   pythonAvailable: boolean
   pythonCommand: string | null
   detail: string
+  platform: string
 }
 
 export type SelectedAudioFile = {

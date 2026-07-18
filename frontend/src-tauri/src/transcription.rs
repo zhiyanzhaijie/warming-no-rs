@@ -17,6 +17,23 @@ const SUPPORTED_AUDIO_EXTENSIONS: &[&str] = &[
     "mp3", "flac", "wav", "m4a", "aac", "ogg", "opus", "aiff", "aif", "wma",
 ];
 const MAX_LOG_LINES: usize = 160;
+const REQUIRED_PYTHON_MAJOR: u8 = 3;
+const REQUIRED_PYTHON_MINOR: u8 = 11;
+const REQUIRED_TRANSKUN_VERSION: &str = "2.0.1";
+
+#[cfg(any(
+    target_os = "windows",
+    all(target_os = "macos", target_arch = "x86_64")
+))]
+const REQUIRED_NCLS_VERSION: &str = "0.0.68";
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+const REQUIRED_NCLS_VERSION: &str = "0.0.70";
+#[cfg(not(any(
+    target_os = "windows",
+    all(target_os = "macos", target_arch = "x86_64"),
+    all(target_os = "macos", target_arch = "aarch64")
+)))]
+const REQUIRED_NCLS_VERSION: &str = "0.0.70";
 
 fn is_supported_audio_file(path: &Path) -> bool {
     path.extension()
@@ -33,6 +50,7 @@ pub struct TranskunStatus {
     python_available: bool,
     python_command: Option<String>,
     detail: String,
+    platform: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -68,6 +86,13 @@ enum TranscriptionTaskStatus {
     Failed,
 }
 
+#[derive(Clone, Default)]
+pub struct TranscriptionState {
+    task: Arc<Mutex<TranscriptionTask>>,
+    install_task: Arc<Mutex<TranskunInstallTask>>,
+    cancel_requested: Arc<AtomicBool>,
+}
+
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TranskunInstallTask {
@@ -86,25 +111,57 @@ enum TranskunInstallStatus {
     Failed,
 }
 
-#[derive(Clone, Default)]
-pub struct TranscriptionState {
-    task: Arc<Mutex<TranscriptionTask>>,
-    install_task: Arc<Mutex<TranskunInstallTask>>,
-    cancel_requested: Arc<AtomicBool>,
+#[derive(Clone)]
+struct PythonCommand {
+    executable: PathBuf,
+    arguments: Vec<String>,
+}
+
+impl PythonCommand {
+    fn label(&self) -> String {
+        let mut parts = vec![self.executable.display().to_string()];
+        parts.extend(self.arguments.clone());
+        parts.join(" ")
+    }
+
+    fn command(&self) -> Command {
+        let mut command = Command::new(&self.executable);
+        command.args(&self.arguments);
+        command
+    }
+
+    fn output(&self, arguments: &[&str]) -> Option<std::process::Output> {
+        self.command().args(arguments).output().ok()
+    }
+}
+
+#[derive(Clone)]
+struct PythonProbe {
+    command: PythonCommand,
+    version: String,
+    implementation: String,
+    bits: u16,
+}
+
+struct PythonSearch {
+    compatible: Option<PythonCommand>,
+    detected: Option<PythonProbe>,
 }
 
 #[derive(Clone)]
 struct TranskunCommand {
-    executable: PathBuf,
+    python: PythonCommand,
 }
 
 impl TranskunCommand {
     fn label(&self) -> String {
-        "transkun".to_string()
+        format!("{} -m transkun.transcribe", self.python.label())
     }
 
     fn spawn(&self, input: &Path, output: &Path) -> Result<Child, String> {
-        Command::new(&self.executable)
+        self.python
+            .command()
+            .args(["-m", "transkun.transcribe"])
             .arg(input)
             .arg(output)
             .env("PYTHONUNBUFFERED", "1")
@@ -115,121 +172,205 @@ impl TranskunCommand {
     }
 }
 
-fn find_transkun() -> Option<TranskunCommand> {
-    let python = find_python()?;
-    if !transkun_runtime_available(&python) {
-        return None;
+fn find_transkun(python: &PythonCommand) -> Option<TranskunCommand> {
+    transkun_runtime_available(python).then(|| TranskunCommand {
+        python: python.clone(),
+    })
+}
+
+fn transkun_runtime_available(python: &PythonCommand) -> bool {
+    let version_script = concat!(
+        "import importlib.metadata as m; ",
+        "print(m.version('transkun') + '|' + m.version('ncls'))"
+    );
+    let Some(version_output) = python.output(&["-c", version_script]) else {
+        return false;
+    };
+    if !version_output.status.success() {
+        return false;
+    }
+    let versions = String::from_utf8_lossy(&version_output.stdout);
+    let expected = format!("{REQUIRED_TRANSKUN_VERSION}|{REQUIRED_NCLS_VERSION}");
+    if versions.trim() != expected {
+        return false;
     }
 
-    let path_command = PathBuf::from("transkun");
-    if transkun_command_available(&path_command) {
-        return Some(TranskunCommand {
-            executable: path_command,
-        });
-    }
+    matches!(
+        python.output(&["-m", "transkun.transcribe", "--help"]),
+        Some(output) if output.status.success()
+    )
+}
 
-    let python_path = Path::new(&python);
-    if let Some(executable) = python_path
-        .parent()
-        .map(|directory| directory.join("transkun"))
-        .filter(|executable| transkun_command_available(executable))
-    {
-        return Some(TranskunCommand { executable });
-    }
+fn python_candidates() -> Vec<PythonCommand> {
+    #[cfg(target_os = "windows")]
+    let candidates = vec![
+        PythonCommand {
+            executable: PathBuf::from("py"),
+            arguments: vec!["-3.11".to_string()],
+        },
+        PythonCommand {
+            executable: PathBuf::from("python"),
+            arguments: Vec::new(),
+        },
+        PythonCommand {
+            executable: PathBuf::from("python3"),
+            arguments: Vec::new(),
+        },
+    ];
 
-    let output = Command::new(&python)
-        .args(["-m", "site", "--user-base"])
-        .output()
-        .ok()?;
+    #[cfg(not(target_os = "windows"))]
+    let candidates = vec![
+        PythonCommand {
+            executable: PathBuf::from(
+                "/Library/Frameworks/Python.framework/Versions/3.11/bin/python3",
+            ),
+            arguments: Vec::new(),
+        },
+        PythonCommand {
+            executable: PathBuf::from("/opt/homebrew/bin/python3.11"),
+            arguments: Vec::new(),
+        },
+        PythonCommand {
+            executable: PathBuf::from("/usr/local/bin/python3.11"),
+            arguments: Vec::new(),
+        },
+        PythonCommand {
+            executable: PathBuf::from("python3.11"),
+            arguments: Vec::new(),
+        },
+        PythonCommand {
+            executable: PathBuf::from("python3"),
+            arguments: Vec::new(),
+        },
+        PythonCommand {
+            executable: PathBuf::from("python"),
+            arguments: Vec::new(),
+        },
+    ];
+
+    candidates
+}
+
+fn probe_python(command: PythonCommand) -> Option<PythonProbe> {
+    let script = concat!(
+        "import platform, struct, sys; ",
+        "print(platform.python_implementation() + '|' + ",
+        "'.'.join(map(str, sys.version_info[:3])) + '|' + ",
+        "str(struct.calcsize('P') * 8))"
+    );
+    let output = command.output(&["-c", script])?;
     if !output.status.success() {
         return None;
     }
-
-    let user_base = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if user_base.is_empty() {
-        return None;
-    }
-
-    let executable = PathBuf::from(user_base).join("bin").join("transkun");
-    transkun_command_available(&executable).then_some(TranskunCommand { executable })
-}
-
-fn transkun_command_available(executable: &Path) -> bool {
-    matches!(
-        Command::new(executable).arg("--help").output(),
-        Ok(output) if output.status.success()
-    )
-}
-
-fn transkun_runtime_available(python: &str) -> bool {
-    matches!(
-        Command::new(python)
-            .args(["-c", "import pkg_resources; import pydub"])
-            .output(),
-        Ok(output) if output.status.success()
-    )
-}
-
-fn find_python() -> Option<String> {
-    let mut candidates = vec![
-        PathBuf::from("/Library/Frameworks/Python.framework/Versions/Current/bin/python3"),
-        PathBuf::from("/opt/homebrew/bin/python3"),
-        PathBuf::from("/usr/local/bin/python3"),
-        PathBuf::from("python3"),
-        PathBuf::from("python"),
-    ];
-    if let Some(home) = std::env::var_os("HOME") {
-        candidates.push(PathBuf::from(home).join(".local/bin/python3"));
-    }
-
-    candidates.into_iter().find_map(|python| {
-        let output = Command::new(&python)
-            .args(["-c", "import sys; print(sys.executable)"])
-            .output()
-            .ok()?;
-        if !output.status.success() {
-            return None;
-        }
-        let executable = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if executable.starts_with("/usr/bin/") || executable.contains("/Xcode.app/") {
-            return None;
-        }
-        Some(executable)
+    let value = String::from_utf8_lossy(&output.stdout);
+    let mut parts = value.trim().split('|');
+    let implementation = parts.next()?.to_string();
+    let version = parts.next()?.to_string();
+    let bits = parts.next()?.parse().ok()?;
+    Some(PythonProbe {
+        command,
+        version,
+        implementation,
+        bits,
     })
+}
+
+fn find_python() -> PythonSearch {
+    let mut detected = None;
+    for candidate in python_candidates() {
+        let Some(probe) = probe_python(candidate) else {
+            continue;
+        };
+        let mut version_parts = probe.version.split('.');
+        let major = version_parts
+            .next()
+            .and_then(|value| value.parse::<u8>().ok());
+        let minor = version_parts
+            .next()
+            .and_then(|value| value.parse::<u8>().ok());
+        let compatible = probe.implementation == "CPython"
+            && major == Some(REQUIRED_PYTHON_MAJOR)
+            && minor == Some(REQUIRED_PYTHON_MINOR)
+            && probe.bits == 64;
+        if compatible {
+            return PythonSearch {
+                compatible: Some(probe.command.clone()),
+                detected: Some(probe),
+            };
+        }
+        if detected.is_none() {
+            detected = Some(probe);
+        }
+    }
+    PythonSearch {
+        compatible: None,
+        detected,
+    }
+}
+
+fn platform_label() -> &'static str {
+    #[cfg(target_os = "windows")]
+    return "Windows";
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    return "macOS ARM";
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    return "macOS Intel";
+    #[cfg(not(any(
+        target_os = "windows",
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "macos", target_arch = "x86_64")
+    )))]
+    return "当前系统";
 }
 
 #[tauri::command]
 pub async fn check_transkun() -> TranskunStatus {
-    match tauri::async_runtime::spawn_blocking(find_transkun).await {
-        Ok(Some(command)) => TranskunStatus {
-            available: true,
-            command: Some(command.label()),
-            python_available: true,
-            python_command: find_python(),
-            detail: "TransKun 已就绪，可以开始转换。".to_string(),
-        },
-        Ok(None) => match find_python() {
-            Some(python) => TranskunStatus {
-                available: false,
-                command: None,
-                python_available: true,
-                python_command: Some(python),
-                detail: "已找到 Python，但还没有安装 TransKun。".to_string(),
-            },
-            None => TranskunStatus {
+    match tauri::async_runtime::spawn_blocking(find_python).await {
+        Ok(search) => {
+            let python_command = search
+                .compatible
+                .as_ref()
+                .map(PythonCommand::label)
+                .or_else(|| search.detected.as_ref().map(|probe| probe.command.label()));
+            if let Some(python) = search.compatible {
+                let transkun = find_transkun(&python);
+                return TranskunStatus {
+                    available: transkun.is_some(),
+                    command: transkun.as_ref().map(TranskunCommand::label),
+                    python_available: true,
+                    python_command,
+                    detail: if transkun.is_some() {
+                        format!("已识别到 {} 环境，转换引擎已就绪。", platform_label())
+                    } else {
+                        format!("已识别到 {} 环境，可以安装转换引擎。", platform_label())
+                    },
+                    platform: platform_label().to_string(),
+                };
+            }
+
+            let detail = match search.detected {
+                Some(probe) => format!(
+                    "检测到 {} {}（{} 位），需要 CPython 3.11.x 64 位。",
+                    probe.implementation, probe.version, probe.bits
+                ),
+                None => "没有找到 Python，需要安装 CPython 3.11.x 64 位。".to_string(),
+            };
+            TranskunStatus {
                 available: false,
                 command: None,
                 python_available: false,
-                python_command: None,
-                detail: "没有找到 Python。请先安装 Python。".to_string(),
-            },
-        },
+                python_command,
+                detail,
+                platform: platform_label().to_string(),
+            }
+        }
         Err(error) => TranskunStatus {
             available: false,
             command: None,
             python_available: false,
             python_command: None,
             detail: format!("检测 TransKun 时发生错误：{error}"),
+            platform: platform_label().to_string(),
         },
     }
 }
@@ -253,11 +394,11 @@ pub async fn install_transkun(
     {
         let mut task = install_task.lock().unwrap_or_else(|lock| lock.into_inner());
         if task.status == TranskunInstallStatus::Running {
-            return Err("TransKun 正在安装，请稍候。".to_string());
+            return Err("转换引擎正在安装，请稍候。".to_string());
         }
         *task = TranskunInstallTask {
             status: TranskunInstallStatus::Running,
-            logs: vec!["正在准备 TransKun 安装环境".to_string()],
+            logs: vec![format!("已识别到 {} 环境", platform_label())],
             error: None,
         };
     }
@@ -270,38 +411,34 @@ pub async fn install_transkun(
 fn run_transkun_install(
     install_task: Arc<Mutex<TranskunInstallTask>>,
 ) -> Result<TranskunStatus, String> {
-    let python = match find_python() {
-        Some(python) => python,
-        None => {
-            let error = "没有找到 Python，请先安装 Python。".to_string();
-            finish_install_task(&install_task, TranskunInstallStatus::Failed, Some(error.clone()));
-            return Err(error);
-        }
+    let search = find_python();
+    let Some(python) = search.compatible else {
+        let error = "没有找到兼容的 CPython 3.11.x 64 位环境。".to_string();
+        finish_install_task(
+            &install_task,
+            TranskunInstallStatus::Failed,
+            Some(error.clone()),
+        );
+        return Err(error);
     };
-    push_install_log(&install_task, format!("使用 Python：{python}"));
-    push_install_log(&install_task, "正在下载并安装 TransKun 及其依赖".to_string());
+    push_install_log(&install_task, "正在下载并安装转换引擎".to_string());
 
-    let mut child = match Command::new(&python)
-            .args([
-                "-m",
-                "pip",
-                "install",
-                "transkun",
-                "setuptools<82",
-                "audioop-lts; python_version >= '3.13'",
-            ])
-            .env("PYTHONUNBUFFERED", "1")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-    {
-        Ok(child) => child,
-        Err(error) => {
-            let error = format!("无法启动 Python：{error}");
-            finish_install_task(&install_task, TranskunInstallStatus::Failed, Some(error.clone()));
-            return Err(error);
-        }
-    };
+    let mut child = python
+        .command()
+        .args([
+            "-m",
+            "pip",
+            "install",
+            "--only-binary=ncls",
+            &format!("ncls=={REQUIRED_NCLS_VERSION}"),
+            &format!("transkun=={REQUIRED_TRANSKUN_VERSION}"),
+            "setuptools<82",
+        ])
+        .env("PYTHONUNBUFFERED", "1")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("无法启动 Python：{error}"))?;
 
     let mut readers = Vec::new();
     if let Some(stdout) = child.stdout.take() {
@@ -312,37 +449,52 @@ fn run_transkun_install(
         let task = install_task.clone();
         readers.push(thread::spawn(move || read_install_output(stderr, task)));
     }
-    let status = child.wait().map_err(|error| format!("等待安装进程时发生错误：{error}"));
+    let status = child
+        .wait()
+        .map_err(|error| format!("等待安装进程时发生错误：{error}"));
     for reader in readers {
         let _ = reader.join();
     }
 
     match status {
-        Ok(status) if status.success() => match find_transkun() {
+        Ok(status) if status.success() => match find_transkun(&python) {
             Some(command) => {
-                push_install_log(&install_task, "TransKun 安装完成".to_string());
+                push_install_log(&install_task, "转换引擎安装完成".to_string());
                 finish_install_task(&install_task, TranskunInstallStatus::Succeeded, None);
                 Ok(TranskunStatus {
-                available: true,
-                command: Some(command.label()),
-                python_available: true,
-                python_command: Some(python),
-                detail: "TransKun 已安装，可以开始转换。".to_string(),
+                    available: true,
+                    command: Some(command.label()),
+                    python_available: true,
+                    python_command: Some(python.label()),
+                    detail: format!("已识别到 {} 环境，转换引擎已就绪。", platform_label()),
+                    platform: platform_label().to_string(),
                 })
             }
             None => {
-                let error = "安装完成，但应用仍未找到 TransKun。请重新检测。".to_string();
-                finish_install_task(&install_task, TranskunInstallStatus::Failed, Some(error.clone()));
+                let error = "安装完成，但转换引擎检测未通过。".to_string();
+                finish_install_task(
+                    &install_task,
+                    TranskunInstallStatus::Failed,
+                    Some(error.clone()),
+                );
                 Err(error)
             }
         },
         Ok(status) => {
-            let error = format!("TransKun 安装失败，退出状态：{status}");
-            finish_install_task(&install_task, TranskunInstallStatus::Failed, Some(error.clone()));
+            let error = format!("转换引擎安装失败，退出状态：{status}");
+            finish_install_task(
+                &install_task,
+                TranskunInstallStatus::Failed,
+                Some(error.clone()),
+            );
             Err(error)
         }
         Err(error) => {
-            finish_install_task(&install_task, TranskunInstallStatus::Failed, Some(error.clone()));
+            finish_install_task(
+                &install_task,
+                TranskunInstallStatus::Failed,
+                Some(error.clone()),
+            );
             Err(error)
         }
     }
@@ -455,7 +607,11 @@ pub async fn generate_midi(
         return Ok(None);
     };
 
-    let command = find_transkun().ok_or_else(|| "TransKun 当前不可用，请重新检测。".to_string())?;
+    let python = find_python()
+        .compatible
+        .ok_or_else(|| "没有找到兼容的 CPython 3.11.x 64 位环境。".to_string())?;
+    let command = find_transkun(&python)
+        .ok_or_else(|| "TransKun 或 ncls 版本不符合要求，请重新检测。".to_string())?;
     let metadata = input
         .metadata()
         .map_err(|error| format!("无法读取文件：{error}"))?;

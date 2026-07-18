@@ -10,7 +10,7 @@ import {
   Upload,
   Wrench,
 } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import {
   transcriptionApi,
   type SelectedAudioFile,
@@ -27,7 +27,7 @@ const workflow = [
   '完成本地转写',
 ]
 
-const PYTHON_DOWNLOAD_URL = 'https://www.python.org/downloads/macos/'
+const PYTHON_DOWNLOAD_URL = 'https://www.python.org/downloads/release/python-3119/'
 
 async function openPythonDownloads() {
   try {
@@ -86,7 +86,7 @@ export function ProcessingPage() {
       queryClient.setQueryData(['transkun-status'], status)
       setMessage(null)
     },
-    onError: (error) => setMessage(error instanceof Error ? error.message : 'TransKun 安装失败'),
+    onError: (error) => setMessage(error instanceof Error ? error.message : '转换引擎安装失败'),
     onSettled: () => {
       void installTask.refetch()
     },
@@ -512,78 +512,49 @@ function TranskunInstallGuide({
   onRefresh: () => void
 }) {
   const pythonAvailable = status?.pythonAvailable === true
-  return (
-    <section className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto border-b border-border px-8 py-10 max-[720px]:px-5">
-      <div className="w-full max-w-2xl">
-        <div className="border-b border-border pb-5">
-          <p className="text-[9px] font-bold tracking-[0.28em] text-primary">需要准备转换环境</p>
-          <h2 className="mt-2 font-title text-xl font-bold text-foreground">
-            {pythonAvailable ? '安装 TransKun' : '先安装 Python'}
-          </h2>
-          <p className="mt-2 max-w-xl text-xs leading-5 text-muted-foreground">
-            {pythonAvailable
-              ? 'Python 已准备好。点击下面的按钮，应用会自动安装 TransKun。'
-              : '音频转 MIDI 需要 Python。请先从官网下载并安装 Python，完成后回来重新检测。'}
-          </p>
-        </div>
 
-        <div className="divide-y divide-border">
-          <InstallStep number="01" title={pythonAvailable ? 'Python 已找到' : '安装 Python'}>
-            {pythonAvailable ? (
-              <p className="text-[10px] leading-5 text-primary">应用已经找到 Python，可以继续安装 TransKun。</p>
-            ) : (
-              <>
-                <p className="text-[10px] leading-5 text-muted-foreground">
-                  从 Python 官网下载 macOS 安装包，按安装向导完成安装。
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void openPythonDownloads()}
-                  className="mt-3 inline-flex h-8 items-center border border-border px-3 text-[10px] font-bold text-foreground transition-colors hover:border-primary hover:text-primary"
-                >
-                  打开 Python 下载页
-                </button>
-              </>
-            )}
-          </InstallStep>
-          <InstallStep number="02" title="让应用安装 TransKun">
-            <p className="text-[10px] leading-5 text-muted-foreground">
-              Python 检测成功后，应用会自动完成安装，不需要打开终端。
-            </p>
+  return (
+    <section className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto border-b border-border px-8 py-8 max-[720px]:px-5 max-[720px]:py-6">
+      <div className="w-full max-w-2xl">
+        <div className="border-y border-border py-6">
+          <p className="text-[9px] font-bold tracking-[0.28em] text-muted-foreground">已识别到操作系统环境</p>
+          <p className="mt-2 font-title text-xl font-bold text-foreground">{status?.platform ?? '正在识别'}</p>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
             {pythonAvailable ? (
               <button
                 type="button"
                 onClick={onInstall}
                 disabled={installing}
-                className="mt-3 flex h-9 items-center gap-2 bg-primary px-4 text-[10px] font-bold tracking-widest text-primary-foreground transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-50"
+                className="flex h-9 items-center gap-2 bg-primary px-4 text-[10px] font-bold tracking-widest text-primary-foreground transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-50"
               >
                 {installing ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
-                {installing ? '正在安装 TransKun' : '安装 TransKun'}
+                {installing ? '正在安装转换引擎' : '安装转换引擎'}
               </button>
-            ) : null}
-            {installTask && installTask.status !== 'idle' ? (
-              <InstallLogPanel task={installTask} />
-            ) : null}
-          </InstallStep>
-          <InstallStep number="03" title="完成后重新检测">
-            <p className="text-[10px] leading-5 text-muted-foreground">
-              安装完成后点击重新检测，确认转换功能已经准备好。
-            </p>
-          </InstallStep>
-        </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void openPythonDownloads()}
+                className="h-9 bg-primary px-4 text-[10px] font-bold tracking-widest text-primary-foreground transition hover:bg-primary-hover"
+              >
+                下载 Python 3.11
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={installing}
+              className="grid size-9 place-items-center border border-border text-muted-foreground transition hover:border-foreground/35 hover:bg-foreground hover:text-background disabled:opacity-40"
+              aria-label="重新检测转换环境"
+              title="重新检测转换环境"
+            >
+              <RefreshCw className="size-3.5" />
+            </button>
+          </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-          <p className="text-[10px] text-muted-foreground">
-            官方项目：<span className="text-foreground/75">github.com/Yujia-Yan/Transkun</span>
-          </p>
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="flex h-9 items-center gap-2 bg-primary px-4 text-[10px] font-bold tracking-widest text-primary-foreground transition hover:bg-primary-hover"
-          >
-            <RefreshCw className="size-3.5" />
-            重新检测
-          </button>
+          {installTask && installTask.status !== 'idle' ? (
+            <InstallLogPanel task={installTask} />
+          ) : null}
         </div>
       </div>
     </section>
@@ -594,7 +565,7 @@ function InstallLogPanel({ task }: { task: TranskunInstallTask }) {
   const running = task.status === 'running'
   const logs = task.logs.slice(-12)
   return (
-    <div className="mt-4 border-l-2 border-primary/60 pl-3">
+    <div className="mt-5 border-l-2 border-primary/60 pl-3">
       <div className="flex items-center justify-between gap-4 text-[9px] font-bold tracking-[0.18em]">
         <span className={task.status === 'failed' ? 'text-destructive' : 'text-primary'}>
           {running ? '正在安装' : task.status === 'succeeded' ? '安装完成' : '安装失败'}
@@ -607,28 +578,6 @@ function InstallLogPanel({ task }: { task: TranskunInstallTask }) {
           : <p>等待安装输出...</p>}
       </div>
       {task.error ? <p data-selectable className="mt-2 text-[10px] leading-5 text-destructive">{task.error}</p> : null}
-    </div>
-  )
-}
-
-function InstallStep({
-  number,
-  title,
-  children,
-}: {
-  number: string
-  title: string
-  children: ReactNode
-}) {
-  return (
-    <div className="grid grid-cols-[2rem_minmax(0,1fr)] gap-4 py-5">
-      <span className="grid size-6 place-items-center border border-border text-[9px] font-bold text-muted-foreground">
-        {number}
-      </span>
-      <div className="min-w-0">
-        <h3 className="text-xs font-bold text-foreground/90">{title}</h3>
-        <div className="mt-2">{children}</div>
-      </div>
     </div>
   )
 }
