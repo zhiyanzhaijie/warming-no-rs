@@ -115,7 +115,7 @@ jobs:
     name: Build macOS ARM64 DMG
     if: inputs.platform == 'all' || inputs.platform == 'macos-arm64'
     needs: prepare-release
-    runs-on: macos-14
+    runs-on: macos-14-arm64
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -136,6 +136,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.11.28
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
@@ -224,6 +231,13 @@ jobs:
         with:
           targets: x86_64-apple-darwin
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.11.28
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
@@ -310,6 +324,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.11.28
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2

@@ -11,8 +11,14 @@ const buildDir = join(tauriDir, 'target', 'python-sidecar')
 
 function run(command, args) {
   const result = spawnSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  if (result.error) {
+    throw new Error(`failed to start ${command}: ${result.error.message}`, {
+      cause: result.error,
+    })
+  }
   if (result.status !== 0) {
-    throw new Error(result.stderr || result.stdout || `${command} failed`)
+    const details = result.stderr.trim() || result.stdout.trim() || 'no output'
+    throw new Error(`${command} exited with status ${result.status}:\n${details}`)
   }
   return result.stdout.trim()
 }
@@ -30,6 +36,18 @@ const rustHost = run('rustc', ['-vV'])
   ?.slice('host: '.length)
 const targetTriple = process.env.TAURI_ENV_TARGET_TRIPLE || process.env.CARGO_BUILD_TARGET || rustHost
 if (!targetTriple) throw new Error('could not determine the Rust target triple')
+
+const targetArchitecture = targetTriple.startsWith('aarch64-')
+  ? 'arm64'
+  : targetTriple.startsWith('x86_64-')
+    ? 'x64'
+    : null
+if (targetArchitecture && targetArchitecture !== process.arch) {
+  throw new Error(
+    `PyInstaller cannot cross-compile from ${process.arch} to ${targetArchitecture}; ` +
+      `run this build on a ${targetArchitecture} host`,
+  )
+}
 
 const suffix = process.platform === 'win32' ? '.exe' : ''
 const output = join(tauriDir, 'binaries', `warming-backend-${targetTriple}${suffix}`)
