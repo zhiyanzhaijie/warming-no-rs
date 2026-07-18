@@ -28,6 +28,7 @@ cpal = "0.17.3"
 oxisynth = "0.1.0"
 midir = "0.11"
 tauri-plugin-opener = "2"
+tauri-plugin-shell = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [

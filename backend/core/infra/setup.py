@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -139,4 +140,7 @@ def init_app_container(state_path: str | None = None) -> AppContainer:
 
 
 def default_state_path() -> Path:
+    configured_path = os.environ.get("WARMING_STATE_PATH")
+    if configured_path:
+        return Path(configured_path).expanduser()
     return Path(__file__).resolve().parents[2] / ".local" / "app.db"

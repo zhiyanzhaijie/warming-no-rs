@@ -32,7 +32,10 @@ fn set_traffic_lights_visible(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
+            python_sidecar::init(app.handle()).map_err(Error::other)?;
+
             #[cfg(any(target_os = "macos", target_os = "windows"))]
             let main_window = app.get_webview_window("main").ok_or_else(|| {
                 Error::new(ErrorKind::NotFound, "main window was not created")

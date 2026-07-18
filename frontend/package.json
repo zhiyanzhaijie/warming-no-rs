@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:python-sidecar": "node scripts/build-python-sidecar.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "tauri": "tauri",

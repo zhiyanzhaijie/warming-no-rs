@@ -1,17 +1,66 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
-    io::{BufRead, BufReader, Write},
+    fs,
     path::PathBuf,
-    process::{Child, ChildStdin, Command, Stdio},
     sync::{
         atomic::{AtomicU64, Ordering},
         Mutex, OnceLock,
     },
 };
+use tauri::Manager;
+use tauri_plugin_shell::{
+    process::{CommandChild, CommandEvent},
+    ShellExt,
+};
 
 static SIDECAR: OnceLock<Mutex<PythonSidecar>> = OnceLock::new();
+static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
+static LAUNCH_CONFIG: OnceLock<LaunchConfig> = OnceLock::new();
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
+
+enum LaunchConfig {
+    Development {
+        backend_dir: PathBuf,
+        python: PathBuf,
+    },
+    Packaged {
+        state_path: PathBuf,
+    },
+}
+
+pub fn init(app: &tauri::AppHandle) -> Result<(), String> {
+    let launch_config = if cfg!(debug_assertions) {
+        let backend_dir = find_backend_dir()?;
+        let python = backend_dir.join(".venv/bin/python");
+        if !python.exists() {
+            return Err(format!(
+                "backend virtualenv is missing: {}. Run `cd backend && uv sync --extra dev`.",
+                python.display()
+            ));
+        }
+        LaunchConfig::Development {
+            backend_dir,
+            python,
+        }
+    } else {
+        let data_dir = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|error| error.to_string())?;
+        fs::create_dir_all(&data_dir).map_err(|error| error.to_string())?;
+        LaunchConfig::Packaged {
+            state_path: data_dir.join("app.db"),
+        }
+    };
+
+    LAUNCH_CONFIG
+        .set(launch_config)
+        .map_err(|_| "python sidecar launch config is already initialized".to_string())?;
+    APP_HANDLE
+        .set(app.clone())
+        .map_err(|_| "python sidecar app handle is already initialized".to_string())
+}
 
 #[derive(Debug, Serialize)]
 struct RpcRequest<'a> {
@@ -43,17 +92,15 @@ pub async fn call_async(method: &'static str, params: Value) -> Result<Value, St
 }
 
 struct PythonSidecar {
-    child: Option<Child>,
-    stdin: Option<ChildStdin>,
-    stdout: Option<BufReader<std::process::ChildStdout>>,
+    child: Option<CommandChild>,
+    events: Option<tauri::async_runtime::Receiver<CommandEvent>>,
 }
 
 impl PythonSidecar {
     fn new() -> Self {
         Self {
             child: None,
-            stdin: None,
-            stdout: None,
+            events: None,
         }
     }
 
@@ -67,27 +114,45 @@ impl PythonSidecar {
         };
         let line = serde_json::to_string(&request).map_err(|error| error.to_string())?;
 
-        let stdin = self
-            .stdin
+        let child = self
+            .child
             .as_mut()
             .ok_or_else(|| "python sidecar stdin is not available".to_string())?;
-        stdin
-            .write_all(line.as_bytes())
-            .and_then(|_| stdin.write_all(b"\n"))
-            .and_then(|_| stdin.flush())
-            .map_err(|error| error.to_string())?;
+        if let Err(error) = child.write(format!("{line}\n").as_bytes()) {
+            self.stop();
+            return Err(error.to_string());
+        }
 
-        let stdout = self
-            .stdout
+        let events = self
+            .events
             .as_mut()
             .ok_or_else(|| "python sidecar stdout is not available".to_string())?;
-        let mut response_line = String::new();
-        stdout
-            .read_line(&mut response_line)
-            .map_err(|error| error.to_string())?;
-        if response_line.trim().is_empty() {
-            return Err("python sidecar returned an empty response".to_string());
-        }
+        let response_line = loop {
+            let event = tauri::async_runtime::block_on(events.recv());
+            match event {
+                Some(CommandEvent::Stdout(line)) => {
+                    break String::from_utf8(line).map_err(|error| error.to_string())?;
+                }
+                Some(CommandEvent::Stderr(line)) => {
+                    log::error!("python sidecar: {}", String::from_utf8_lossy(&line));
+                }
+                Some(CommandEvent::Error(error)) => return Err(error),
+                Some(CommandEvent::Terminated(status)) => {
+                    self.child = None;
+                    self.events = None;
+                    return Err(format!(
+                        "python sidecar terminated with code {:?}",
+                        status.code
+                    ));
+                }
+                None => {
+                    self.child = None;
+                    self.events = None;
+                    return Err("python sidecar event stream closed".to_string());
+                }
+                _ => continue,
+            }
+        };
 
         let response: RpcResponse =
             serde_json::from_str(&response_line).map_err(|error| error.to_string())?;
@@ -95,49 +160,59 @@ impl PythonSidecar {
             return Err("python sidecar response id mismatch".to_string());
         }
         if response.ok {
-            Ok(response.result.unwrap_or(Value::Null))
+            Ok(match response.result {
+                Some(result) => result,
+                None => Value::Null,
+            })
         } else {
-            Err(response
-                .error
-                .unwrap_or_else(|| "python sidecar request failed".to_string()))
+            Err(match response.error {
+                Some(error) => error,
+                None => "python sidecar request failed".to_string(),
+            })
         }
     }
 
     fn ensure_running(&mut self) -> Result<(), String> {
-        if let Some(child) = self.child.as_mut() {
-            if child
-                .try_wait()
+        if self.child.is_some() {
+            return Ok(());
+        }
+
+        let app = APP_HANDLE
+            .get()
+            .ok_or_else(|| "python sidecar app handle is not initialized".to_string())?;
+        let launch_config = LAUNCH_CONFIG
+            .get()
+            .ok_or_else(|| "python sidecar launch config is not initialized".to_string())?;
+        let command = match launch_config {
+            LaunchConfig::Development {
+                backend_dir,
+                python,
+            } => app
+                .shell()
+                .command(python)
+                .args(["-m", "core.rpc"])
+                .current_dir(backend_dir),
+            LaunchConfig::Packaged { state_path } => app
+                .shell()
+                .sidecar("warming-backend")
                 .map_err(|error| error.to_string())?
-                .is_none()
-            {
-                return Ok(());
+                .env("WARMING_STATE_PATH", state_path),
+        }
+        .env("PYTHONUNBUFFERED", "1");
+        let (events, child) = command.spawn().map_err(|error| error.to_string())?;
+
+        self.child = Some(child);
+        self.events = Some(events);
+        Ok(())
+    }
+
+    fn stop(&mut self) {
+        self.events = None;
+        if let Some(child) = self.child.take() {
+            if let Err(error) = child.kill() {
+                log::warn!("failed to stop python sidecar: {error}");
             }
         }
-
-        let backend_dir = find_backend_dir()?;
-        let python = backend_dir.join(".venv/bin/python");
-        if !python.exists() {
-            return Err(format!(
-                "backend virtualenv is missing: {}. Run `cd backend && ~/.local/bin/uv sync --extra dev`.",
-                python.display()
-            ));
-        }
-
-        let mut child = Command::new(python)
-            .arg("-m")
-            .arg("core.rpc")
-            .current_dir(&backend_dir)
-            .env("PYTHONUNBUFFERED", "1")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()
-            .map_err(|error| error.to_string())?;
-
-        self.stdin = child.stdin.take();
-        self.stdout = child.stdout.take().map(BufReader::new);
-        self.child = Some(child);
-        Ok(())
     }
 }
 
@@ -230,8 +305,11 @@ pub async fn music_refresh_library() -> Result<Value, String> {
 pub fn select_midi_watch_directories() -> Result<Vec<String>, String> {
     let folders = rfd::FileDialog::new()
         .set_title("选择 MIDI 曲库文件夹")
-        .pick_folders()
-        .unwrap_or_default();
+        .pick_folders();
+    let folders = match folders {
+        Some(folders) => folders,
+        None => Vec::new(),
+    };
     Ok(folders
         .into_iter()
         .map(|path| path.display().to_string())

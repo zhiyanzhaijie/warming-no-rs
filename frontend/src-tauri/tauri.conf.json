@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build"
+    "beforeDevCommand": "pnpm build:python-sidecar && pnpm dev",
+    "beforeBuildCommand": "pnpm build:python-sidecar && pnpm build"
   },
   "app": {
     "windows": [
@@ -38,6 +38,9 @@
     "targets": "all",
     "resources": [
       "resources/default.sf2"
+    ],
+    "externalBin": [
+      "binaries/warming-backend"
     ],
     "icon": [
       "icons/32x32.png",
