@@ -111,6 +111,12 @@ export function LibraryPage() {
     setMessage(null)
   }
 
+  const queryErrorMessage = error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : '同步故障'
+
   return (
     <div className="relative flex h-full w-full overflow-hidden bg-background font-sans text-foreground/90">
       <AsciiMediaBackground
@@ -232,7 +238,7 @@ export function LibraryPage() {
             {(message || isError) && (
               <div className="flex items-start gap-2.5 text-[11px] leading-relaxed">
                 <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/80" />
-                <p className="flex-1 text-muted-foreground">{message || (error instanceof Error ? error.message : '同步故障')}</p>
+                <p className="flex-1 text-muted-foreground">{message || queryErrorMessage}</p>
                 {message && (
                   <button type="button" onClick={() => setMessage(null)} className="opacity-40 hover:opacity-100">
                     <X className="size-3.5" />

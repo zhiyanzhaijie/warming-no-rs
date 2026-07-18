@@ -13,6 +13,12 @@ use std::{
 };
 use tauri::State;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 const SUPPORTED_AUDIO_EXTENSIONS: &[&str] = &[
     "mp3", "flac", "wav", "m4a", "aac", "ogg", "opus", "aiff", "aif", "wma",
 ];
@@ -20,6 +26,13 @@ const MAX_LOG_LINES: usize = 160;
 const REQUIRED_PYTHON_MAJOR: u8 = 3;
 const REQUIRED_PYTHON_MINOR: u8 = 11;
 const REQUIRED_TRANSKUN_VERSION: &str = "2.0.1";
+const REQUIRED_STATIC_FFMPEG_VERSION: &str = "3.0";
+const TRANSKUN_ENTRY_SCRIPT: &str = concat!(
+    "import static_ffmpeg; ",
+    "static_ffmpeg.add_paths(weak=True); ",
+    "from transkun.transcribe import main; ",
+    "main()"
+);
 
 #[cfg(any(
     target_os = "windows",
@@ -127,6 +140,8 @@ impl PythonCommand {
     fn command(&self) -> Command {
         let mut command = Command::new(&self.executable);
         command.args(&self.arguments);
+        #[cfg(target_os = "windows")]
+        command.creation_flags(CREATE_NO_WINDOW);
         command
     }
 
@@ -155,13 +170,13 @@ struct TranskunCommand {
 
 impl TranskunCommand {
     fn label(&self) -> String {
-        format!("{} -m transkun.transcribe", self.python.label())
+        "transkun".to_string()
     }
 
     fn spawn(&self, input: &Path, output: &Path) -> Result<Child, String> {
         self.python
             .command()
-            .args(["-m", "transkun.transcribe"])
+            .args(["-c", TRANSKUN_ENTRY_SCRIPT])
             .arg(input)
             .arg(output)
             .env("PYTHONUNBUFFERED", "1")
@@ -181,7 +196,8 @@ fn find_transkun(python: &PythonCommand) -> Option<TranskunCommand> {
 fn transkun_runtime_available(python: &PythonCommand) -> bool {
     let version_script = concat!(
         "import importlib.metadata as m; ",
-        "print(m.version('transkun') + '|' + m.version('ncls'))"
+        "print(m.version('transkun') + '|' + m.version('ncls') + '|' + ",
+        "m.version('static-ffmpeg'))"
     );
     let Some(version_output) = python.output(&["-c", version_script]) else {
         return false;
@@ -190,13 +206,15 @@ fn transkun_runtime_available(python: &PythonCommand) -> bool {
         return false;
     }
     let versions = String::from_utf8_lossy(&version_output.stdout);
-    let expected = format!("{REQUIRED_TRANSKUN_VERSION}|{REQUIRED_NCLS_VERSION}");
+    let expected = format!(
+        "{REQUIRED_TRANSKUN_VERSION}|{REQUIRED_NCLS_VERSION}|{REQUIRED_STATIC_FFMPEG_VERSION}"
+    );
     if versions.trim() != expected {
         return false;
     }
 
     matches!(
-        python.output(&["-m", "transkun.transcribe", "--help"]),
+        python.output(&["-c", TRANSKUN_ENTRY_SCRIPT, "--help"]),
         Some(output) if output.status.success()
     )
 }
@@ -421,39 +439,79 @@ fn run_transkun_install(
         );
         return Err(error);
     };
+    if !matches!(
+        python.output(&["-m", "pip", "--version"]),
+        Some(output) if output.status.success()
+    ) {
+        push_install_log(&install_task, "正在初始化 Python 安装工具".to_string());
+        let mut ensure_pip = python.command();
+        ensure_pip.args(["-m", "ensurepip", "--upgrade"]);
+        let status = match run_logged_command(ensure_pip, install_task.clone()) {
+            Ok(status) => status,
+            Err(error) => {
+                finish_install_task(
+                    &install_task,
+                    TranskunInstallStatus::Failed,
+                    Some(error.clone()),
+                );
+                return Err(error);
+            }
+        };
+        if !status.success() {
+            let error = format!("Python 安装工具初始化失败，退出状态：{status}");
+            finish_install_task(
+                &install_task,
+                TranskunInstallStatus::Failed,
+                Some(error.clone()),
+            );
+            return Err(error);
+        }
+    }
+
     push_install_log(&install_task, "正在下载并安装转换引擎".to_string());
+    let ncls_requirement = format!("ncls=={REQUIRED_NCLS_VERSION}");
+    let transkun_requirement = format!("transkun=={REQUIRED_TRANSKUN_VERSION}");
+    let ffmpeg_requirement = format!("static-ffmpeg=={REQUIRED_STATIC_FFMPEG_VERSION}");
+    let mut install = python.command();
+    install.args([
+        "-m",
+        "pip",
+        "install",
+        "--only-binary=ncls",
+        &ncls_requirement,
+        &transkun_requirement,
+        &ffmpeg_requirement,
+        "setuptools<82",
+    ]);
+    let status = run_logged_command(install, install_task.clone());
 
-    let mut child = python
-        .command()
-        .args([
-            "-m",
-            "pip",
-            "install",
-            "--only-binary=ncls",
-            &format!("ncls=={REQUIRED_NCLS_VERSION}"),
-            &format!("transkun=={REQUIRED_TRANSKUN_VERSION}"),
-            "setuptools<82",
-        ])
-        .env("PYTHONUNBUFFERED", "1")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("无法启动 Python：{error}"))?;
-
-    let mut readers = Vec::new();
-    if let Some(stdout) = child.stdout.take() {
-        let task = install_task.clone();
-        readers.push(thread::spawn(move || read_install_output(stdout, task)));
-    }
-    if let Some(stderr) = child.stderr.take() {
-        let task = install_task.clone();
-        readers.push(thread::spawn(move || read_install_output(stderr, task)));
-    }
-    let status = child
-        .wait()
-        .map_err(|error| format!("等待安装进程时发生错误：{error}"));
-    for reader in readers {
-        let _ = reader.join();
+    if matches!(&status, Ok(status) if status.success()) {
+        push_install_log(&install_task, "正在准备音频解码组件".to_string());
+        let mut prepare_media_tools = python.command();
+        prepare_media_tools.args([
+            "-c",
+            "import static_ffmpeg; static_ffmpeg.add_paths(weak=True)",
+        ]);
+        let media_status = match run_logged_command(prepare_media_tools, install_task.clone()) {
+            Ok(status) => status,
+            Err(error) => {
+                finish_install_task(
+                    &install_task,
+                    TranskunInstallStatus::Failed,
+                    Some(error.clone()),
+                );
+                return Err(error);
+            }
+        };
+        if !media_status.success() {
+            let error = format!("音频解码组件准备失败，退出状态：{media_status}");
+            finish_install_task(
+                &install_task,
+                TranskunInstallStatus::Failed,
+                Some(error.clone()),
+            );
+            return Err(error);
+        }
     }
 
     match status {
@@ -498,6 +556,35 @@ fn run_transkun_install(
             Err(error)
         }
     }
+}
+
+fn run_logged_command(
+    mut command: Command,
+    install_task: Arc<Mutex<TranskunInstallTask>>,
+) -> Result<std::process::ExitStatus, String> {
+    let mut child = command
+        .env("PYTHONUNBUFFERED", "1")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("无法启动 Python：{error}"))?;
+
+    let mut readers = Vec::new();
+    if let Some(stdout) = child.stdout.take() {
+        let task = install_task.clone();
+        readers.push(thread::spawn(move || read_install_output(stdout, task)));
+    }
+    if let Some(stderr) = child.stderr.take() {
+        let task = install_task.clone();
+        readers.push(thread::spawn(move || read_install_output(stderr, task)));
+    }
+    let status = child
+        .wait()
+        .map_err(|error| format!("等待安装进程时发生错误：{error}"));
+    for reader in readers {
+        let _ = reader.join();
+    }
+    status
 }
 
 fn read_install_output<R: Read>(reader: R, task: Arc<Mutex<TranskunInstallTask>>) {

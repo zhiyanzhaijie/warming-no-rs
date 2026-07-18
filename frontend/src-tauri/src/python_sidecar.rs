@@ -198,7 +198,9 @@ impl PythonSidecar {
                 .map_err(|error| error.to_string())?
                 .env("WARMING_STATE_PATH", state_path),
         }
-        .env("PYTHONUNBUFFERED", "1");
+        .env("PYTHONUNBUFFERED", "1")
+        .env("PYTHONIOENCODING", "utf-8")
+        .env("PYTHONUTF8", "1");
         let (events, child) = command.spawn().map_err(|error| error.to_string())?;
 
         self.child = Some(child);

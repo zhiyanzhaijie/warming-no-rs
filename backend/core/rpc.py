@@ -18,7 +18,15 @@ from core.infra.setup import default_state_path, init_app_container
 container = init_app_container()
 
 
+def configure_standard_streams() -> None:
+    if hasattr(sys.stdin, "reconfigure"):
+        sys.stdin.reconfigure(encoding="utf-8")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
+
 def main() -> None:
+    configure_standard_streams()
     for line in sys.stdin:
         line = line.strip()
         if not line:
