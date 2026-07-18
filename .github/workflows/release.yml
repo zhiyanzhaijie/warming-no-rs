@@ -115,7 +115,7 @@ jobs:
     name: Build macOS ARM64 DMG
     if: inputs.platform == 'all' || inputs.platform == 'macos-arm64'
     needs: prepare-release
-    runs-on: macos-14-arm64
+    runs-on: macos-15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -209,7 +209,7 @@ jobs:
     name: Build macOS Intel DMG
     if: inputs.platform == 'all' || inputs.platform == 'macos-intel'
     needs: prepare-release
-    runs-on: macos-14
+    runs-on: macos-15-intel
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
