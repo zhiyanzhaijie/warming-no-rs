@@ -92,7 +92,7 @@ export function AppShell() {
         >
           <SidebarHeader className="p-2 group-data-[collapsible=icon]:items-center">
             <WindowControls />
-            <div className="mt-5 flex min-w-0 items-center gap-3 bg-transparent group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center">
+            <div className="mt-5 flex min-w-0 flex-nowrap items-center gap-3 overflow-hidden bg-transparent transition-[gap] duration-200 ease-out group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
               <span className="relative h-16 w-8 shrink-0 overflow-hidden bg-primary rounded-sm">
                 <img
                   src={warmingLogo}
@@ -100,20 +100,20 @@ export function AppShell() {
                   className="absolute left-1/2 top-1/2 block h-5 w-12 max-w-none -translate-x-1/2 -translate-y-1/2 -rotate-90 object-contain"
                 />
               </span>
-              <div className="min-w-0 flex-1 group-data-[collapsible=icon]:sr-only">
-                <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 max-w-full flex-1 overflow-hidden transition-[max-width,opacity,transform] duration-200 ease-out group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:translate-x-1 group-data-[collapsible=icon]:opacity-0">
+                <div className="flex min-w-0 items-center justify-between gap-2 whitespace-nowrap">
                   <p className="text-[9px] font-bold tracking-[0.2em] text-muted-foreground">设备</p>
-                  <span className={`text-[8px] font-bold tracking-wider ${inputStatus === 'error' ? 'text-destructive' : 'text-primary'}`}>
+                  <span className={`shrink-0 text-[8px] font-bold tracking-wider whitespace-nowrap ${inputStatus === 'error' ? 'text-destructive' : 'text-primary'}`}>
                     {inputStatusLabel}
                   </span>
                 </div>
                 <p className="mt-2 truncate text-xs font-bold text-sidebar-foreground" title={activeInputDevice.name}>
                   {activeInputDevice.name}
                 </p>
-                <div className="mt-2 flex items-center gap-2 text-[9px] tracking-wide text-muted-foreground">
-                  <span>{inputSpecification}</span>
-                  <span className="h-2 w-px bg-sidebar-border" />
-                  <span className="truncate">{inputRange}</span>
+                <div className="mt-2 flex min-w-0 flex-nowrap items-center gap-2 text-[9px] tracking-wide text-muted-foreground whitespace-nowrap">
+                  <span className="shrink-0">{inputSpecification}</span>
+                  <span className="h-2 w-px shrink-0 bg-sidebar-border" />
+                  <span className="min-w-0 truncate">{inputRange}</span>
                 </div>
               </div>
             </div>
