@@ -33,6 +33,10 @@ const TRANSKUN_ENTRY_SCRIPT: &str = concat!(
     "from transkun.transcribe import main; ",
     "main()"
 );
+const TRANSKUN_IMPORT_SCRIPT: &str = concat!(
+    "import static_ffmpeg; ",
+    "from transkun.transcribe import main"
+);
 
 #[cfg(any(
     target_os = "windows",
@@ -188,35 +192,53 @@ impl TranskunCommand {
 }
 
 fn find_transkun(python: &PythonCommand) -> Option<TranskunCommand> {
-    transkun_runtime_available(python).then(|| TranskunCommand {
-        python: python.clone(),
-    })
+    validate_transkun_runtime(python)
+        .ok()
+        .map(|()| TranskunCommand {
+            python: python.clone(),
+        })
 }
 
-fn transkun_runtime_available(python: &PythonCommand) -> bool {
+fn validate_transkun_runtime(python: &PythonCommand) -> Result<(), String> {
     let version_script = concat!(
         "import importlib.metadata as m; ",
         "print(m.version('transkun') + '|' + m.version('ncls') + '|' + ",
         "m.version('static-ffmpeg'))"
     );
     let Some(version_output) = python.output(&["-c", version_script]) else {
-        return false;
+        return Err("无法读取转换引擎版本。".to_string());
     };
     if !version_output.status.success() {
-        return false;
+        return Err(process_error("读取转换引擎版本失败", &version_output));
     }
     let versions = String::from_utf8_lossy(&version_output.stdout);
     let expected = format!(
         "{REQUIRED_TRANSKUN_VERSION}|{REQUIRED_NCLS_VERSION}|{REQUIRED_STATIC_FFMPEG_VERSION}"
     );
     if versions.trim() != expected {
-        return false;
+        return Err("转换引擎组件版本不符合当前平台要求。".to_string());
     }
 
-    matches!(
-        python.output(&["-c", TRANSKUN_ENTRY_SCRIPT, "--help"]),
-        Some(output) if output.status.success()
-    )
+    let Some(import_output) = python.output(&["-c", TRANSKUN_IMPORT_SCRIPT]) else {
+        return Err("无法启动转换引擎检测。".to_string());
+    };
+    if !import_output.status.success() {
+        return Err(process_error("转换引擎导入失败", &import_output));
+    }
+    Ok(())
+}
+
+fn process_error(context: &str, output: &std::process::Output) -> String {
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let detail = if !stderr.is_empty() {
+        stderr
+    } else if !stdout.is_empty() {
+        stdout
+    } else {
+        format!("退出状态：{}", output.status)
+    };
+    format!("{context}：{detail}")
 }
 
 fn python_candidates() -> Vec<PythonCommand> {
@@ -515,8 +537,11 @@ fn run_transkun_install(
     }
 
     match status {
-        Ok(status) if status.success() => match find_transkun(&python) {
-            Some(command) => {
+        Ok(status) if status.success() => match validate_transkun_runtime(&python) {
+            Ok(()) => {
+                let command = TranskunCommand {
+                    python: python.clone(),
+                };
                 push_install_log(&install_task, "转换引擎安装完成".to_string());
                 finish_install_task(&install_task, TranskunInstallStatus::Succeeded, None);
                 Ok(TranskunStatus {
@@ -528,8 +553,8 @@ fn run_transkun_install(
                     platform: platform_label().to_string(),
                 })
             }
-            None => {
-                let error = "安装完成，但转换引擎检测未通过。".to_string();
+            Err(detail) => {
+                let error = format!("安装完成，但转换引擎检测未通过：{detail}");
                 finish_install_task(
                     &install_task,
                     TranskunInstallStatus::Failed,
