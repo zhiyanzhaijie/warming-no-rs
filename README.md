@@ -19,7 +19,7 @@
 ## Showcase
 
 <p align="center">
-  <video src="https://raw.githubusercontent.com/zhiyanzhaijie/warming-no-rs/main/frontend/public/display.mp4" width="760" controls muted loop playsinline></video>
+  <img src="frontend/public/display.gif" width="760" alt="Warming Piano demo" />
 </p>
 
 ## Features
